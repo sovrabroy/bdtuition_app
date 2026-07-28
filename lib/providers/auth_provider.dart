@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
 import '../services/api_service.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -168,17 +169,21 @@ class AuthProvider with ChangeNotifier {
   }
 
   String _getErrorMessage(dynamic e) {
-    if (e is Exception) {
-      try {
-        final dioError = e as dynamic;
-        if (dioError.response?.data != null) {
-          final data = dioError.response.data;
-          if (data is Map && data['message'] != null) {
-            return data['message'];
-          }
-        }
-      } catch (_) {}
+  print("ERROR: $e");
+
+  if (e is DioException) {
+    print("STATUS: ${e.response?.statusCode}");
+    print("BODY: ${e.response?.data}");
+
+    if (e.response?.data is Map &&
+        e.response!.data['message'] != null) {
+      return e.response!.data['message'];
     }
-    return 'Something went wrong. Please try again.';
+
+    return e.message ?? "Network Error";
   }
+
+  return e.toString();
 }
+}
+

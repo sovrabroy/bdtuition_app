@@ -9,6 +9,7 @@ import '../tuitions/tuition_list_screen.dart';
 import '../profile/profile_screen.dart';
 import '../guardians/guardian_list_screen.dart';
 import '../payments/payment_screen.dart';
+import '../demo/demo_dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _screens = const [
     DashboardScreen(),
     TuitionListScreen(),
+    DemoDashboardScreen(),
     GuardianListScreen(),
     PaymentScreen(),
     ProfileScreen(),
@@ -67,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Tuitions'),
+          BottomNavigationBarItem(icon: Icon(Icons.verified_user), label: 'Demo'),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Guardians'),
           BottomNavigationBarItem(icon: Icon(Icons.payment), label: 'Payments'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../providers/tuition_provider.dart';
 
@@ -118,17 +119,51 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Details sections
+                  // Details sections. Each row uses _pick() so it works no
+                  // matter which key name the API sends, and empty values are
+                  // hidden instead of showing "N/A".
                   _SectionCard(
                     title: 'Tuition Information',
                     children: [
-                      _DetailRow('Class', tuition['class'] ?? 'N/A'),
-                      _DetailRow('Subject', tuition['subject'] ?? 'N/A'),
-                      _DetailRow('Medium', tuition['medium'] ?? 'N/A'),
-                      _DetailRow(
-                          'Days Per Week', '${tuition['day_per_week'] ?? 'N/A'}'),
-                      _DetailRow('Category', tuition['category'] ?? 'N/A'),
-                      _DetailRow('Curriculum', tuition['curriculum'] ?? 'N/A'),
+                      _row('Class', _pick(tuition, ['class', 'student_class'])),
+                      _row('Subject',
+                          _pick(tuition, ['subject', 'subjects', 'subject_name'])),
+                      _row('Medium', _pick(tuition, ['medium', 'version'])),
+                      _row('Days Per Week', _pick(tuition,
+                          ['day_per_week', 'days_per_week', 'day', 'days'])),
+                      _row('Time', _pick(tuition, [
+                        'time',
+                        'preferred_time',
+                        'tuition_time',
+                        'tution_time',
+                        'class_time'
+                      ])),
+                      _row('Duration',
+                          _pick(tuition, ['duration', 'class_duration'])),
+                      _row('Category',
+                          _pick(tuition, ['category', 'tuition_category'])),
+                      _row('Curriculum',
+                          _pick(tuition, ['curriculum', 'syllabus'])),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  _SectionCard(
+                    title: 'Salary & Fees',
+                    children: [
+                      _row('Salary',
+                          _money(_pick(tuition, ['salary', 'salary_amount']))),
+                      _row(
+                          'Salary Range',
+                          _pick(tuition,
+                              ['salary_range', 'salary_from_to'])),
+                      _row('Media Fee', _pick(tuition, [
+                        'media_fee',
+                        'media_commission',
+                        'media',
+                        'commission',
+                        'media_charge'
+                      ])),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -136,10 +171,10 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
                   _SectionCard(
                     title: 'Location',
                     children: [
-                      _DetailRow('City', tuition['city'] ?? 'N/A'),
-                      _DetailRow('Area', tuition['area'] ?? 'N/A'),
-                      if (tuition['address'] != null)
-                        _DetailRow('Address', tuition['address']),
+                      _row('City', _pick(tuition, ['city', 'district'])),
+                      _row('Area', _pick(tuition, ['area', 'location'])),
+                      _row('Address',
+                          _pick(tuition, ['address', 'full_address'])),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -147,30 +182,27 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
                   _SectionCard(
                     title: 'Requirements',
                     children: [
-                      _DetailRow('Preferred Gender',
-                          tuition['prefered_gender'] ?? 'N/A'),
-                      _DetailRow('Number of Students',
-                          '${tuition['number_of_students'] ?? 'N/A'}'),
-                      if (tuition['other_requirements'] != null &&
-                          tuition['other_requirements'].toString().isNotEmpty)
-                        _DetailRow(
-                            'Other Requirements', tuition['other_requirements']),
+                      _row(
+                          'Preferred Gender',
+                          _pick(tuition,
+                              ['prefered_gender', 'preferred_gender', 'gender'])),
+                      _row(
+                          'Number of Students',
+                          _pick(tuition,
+                              ['number_of_students', 'no_of_students', 'students'])),
+                      _row('Other Requirements',
+                          _pick(tuition, ['other_requirements', 'requirements'])),
                     ],
                   ),
                   const SizedBox(height: 12),
 
-                  _SectionCard(
-                    title: 'Schedule',
-                    children: [
-                      _DetailRow(
-                          'Days Per Week', '${tuition['day_per_week'] ?? 'N/A'}'),
-                      if (tuition['preferred_time'] != null)
-                        _DetailRow('Preferred Time', tuition['preferred_time']),
-                      if (tuition['start_date'] != null)
-                        _DetailRow('Start Date', tuition['start_date']),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                  // Contact info (usually only present after the guardian is
+                  // revealed / eligible). Shown only when the API returns it.
+                  _ContactCard(tuition: tuition),
+
+                  // Anything else the API sent that we didn't render above —
+                  // shown automatically so no field is ever missed.
+                  _AdditionalInfoCard(tuition: tuition),
 
                   // Applicant count
                   if (tuition['total_applicants'] != null)
@@ -268,6 +300,34 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
     );
   }
 
+  /// Returns the first non-empty value among [keys], or '' if none present.
+  /// Lets us support several possible API field names for the same info.
+  String _pick(Map<String, dynamic> data, List<String> keys) {
+    for (final k in keys) {
+      final v = data[k];
+      if (v == null) continue;
+      final s = v.toString().trim();
+      if (s.isEmpty || s.toLowerCase() == 'null') continue;
+      return s;
+    }
+    return '';
+  }
+
+  /// Prefix a currency symbol when the value is a bare number.
+  String _money(String value) {
+    if (value.isEmpty) return '';
+    final hasSymbol = value.contains('৳') ||
+        value.toLowerCase().contains('tk') ||
+        value.contains('%');
+    return hasSymbol ? value : '৳$value';
+  }
+
+  /// A detail row that hides itself when the value is empty.
+  Widget _row(String label, String value) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    return _DetailRow(label, value);
+  }
+
   void _showApplyDialog(int tuitionId) {
     final referenceController = TextEditingController();
     showDialog(
@@ -343,6 +403,11 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Hide the whole card (title + divider) if every row rendered nothing.
+    // Empty rows come back as SizedBox.shrink() (width/height == 0).
+    final visible = children.where((w) => w is! SizedBox).toList();
+    if (visible.isEmpty) return const SizedBox.shrink();
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -358,7 +423,7 @@ class _SectionCard extends StatelessWidget {
               ),
             ),
             const Divider(height: 20),
-            ...children,
+            ...visible,
           ],
         ),
       ),
@@ -399,6 +464,185 @@ class _DetailRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shows guardian/contact info with tap-to-call and WhatsApp buttons.
+/// Only rendered when the API actually returns a contact number.
+class _ContactCard extends StatelessWidget {
+  final Map<String, dynamic> tuition;
+
+  const _ContactCard({required this.tuition});
+
+  String _pick(List<String> keys) {
+    for (final k in keys) {
+      final v = tuition[k];
+      if (v == null) continue;
+      final s = v.toString().trim();
+      if (s.isEmpty || s.toLowerCase() == 'null') continue;
+      return s;
+    }
+    return '';
+  }
+
+  Future<void> _launch(Uri uri) async {
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final phone = _pick(
+        ['contact', 'contact_number', 'phone', 'phone_number', 'mobile', 'whatsapp']);
+    final instruction =
+        _pick(['contact_instruction', 'apply_instruction', 'sms_instruction']);
+
+    if (phone.isEmpty && instruction.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final digits = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Contact',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const Divider(height: 20),
+              if (instruction.isNotEmpty) ...[
+                Text(
+                  instruction,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (phone.isNotEmpty) ...[
+                Row(
+                  children: [
+                    const Icon(Icons.phone,
+                        size: 18, color: AppTheme.primaryColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      phone,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            _launch(Uri.parse('tel:$digits')),
+                        icon: const Icon(Icons.call, size: 18),
+                        label: const Text('Call'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _launch(Uri.parse(
+                            'https://wa.me/${digits.replaceAll('+', '')}')),
+                        icon: const Icon(Icons.chat, size: 18),
+                        label: const Text('WhatsApp'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF25D366),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Automatically renders any remaining API fields we didn't explicitly place
+/// in a section above. Guarantees no data from the backend is ever hidden.
+class _AdditionalInfoCard extends StatelessWidget {
+  final Map<String, dynamic> tuition;
+
+  const _AdditionalInfoCard({required this.tuition});
+
+  // Keys already shown elsewhere or that are internal/not useful to display.
+  static const Set<String> _handled = {
+    'id',
+    'class', 'student_class',
+    'subject', 'subjects', 'subject_name',
+    'medium', 'version',
+    'day_per_week', 'days_per_week', 'day', 'days',
+    'time', 'preferred_time', 'tuition_time', 'tution_time', 'class_time',
+    'duration', 'class_duration',
+    'category', 'tuition_category',
+    'curriculum', 'syllabus',
+    'salary', 'salary_amount', 'salary_range', 'salary_from_to',
+    'media_fee', 'media_commission', 'media', 'commission', 'media_charge',
+    'city', 'district', 'area', 'location', 'address', 'full_address',
+    'prefered_gender', 'preferred_gender', 'gender',
+    'number_of_students', 'no_of_students', 'students',
+    'other_requirements', 'requirements',
+    'contact', 'contact_number', 'phone', 'phone_number', 'mobile', 'whatsapp',
+    'contact_instruction', 'apply_instruction', 'sms_instruction',
+    'tuition_code', 'start_date',
+    // Flags used by the UI logic, not for display.
+    'has_applied', 'can_apply', 'total_applicants', 'status',
+    'created_at', 'updated_at', 'deleted_at',
+  };
+
+  String _humanize(String key) {
+    final cleaned = key.replaceAll(RegExp(r'[_\-]+'), ' ').trim();
+    return cleaned
+        .split(' ')
+        .where((w) => w.isNotEmpty)
+        .map((w) => w[0].toUpperCase() + w.substring(1))
+        .join(' ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    tuition.forEach((key, value) {
+      if (_handled.contains(key)) return;
+      if (value == null) return;
+      // Skip nested objects/lists — only show simple scalar values.
+      if (value is Map || value is List) return;
+      final s = value.toString().trim();
+      if (s.isEmpty || s.toLowerCase() == 'null') return;
+      rows.add(_DetailRow(_humanize(key), s));
+    });
+
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: _SectionCard(
+        title: 'Additional Information',
+        children: rows,
       ),
     );
   }

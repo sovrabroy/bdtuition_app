@@ -4,6 +4,10 @@ import '../services/api_service.dart';
 class TuitionProvider with ChangeNotifier {
   final ApiService _api = ApiService();
   List<dynamic> _tuitions = [];
+  // Tuition IDs the teacher has applied to during this session. Lets the UI
+  // show "Already Applied" instantly even if the backend hasn't refreshed the
+  // has_applied flag yet.
+  final Set<int> _appliedIds = {};
   Map<String, dynamic>? _selectedTuition;
   List<String> _cities = [];
   List<String> _areas = [];
@@ -19,8 +23,24 @@ class TuitionProvider with ChangeNotifier {
   String? _selectedGender;
   String? _searchCode;
 
-  List<dynamic> get tuitions => _tuitions;
-  Map<String, dynamic>? get selectedTuition => _selectedTuition;
+  /// Tuition list with a locally-tracked `has_applied` flag merged in, so cards
+  /// reflect an application immediately without waiting on the backend.
+  List<dynamic> get tuitions => _tuitions.map((t) {
+        if (t is Map<String, dynamic> && _appliedIds.contains(t['id'])) {
+          return {...t, 'has_applied': true};
+        }
+        return t;
+      }).toList();
+
+  Map<String, dynamic>? get selectedTuition {
+    final t = _selectedTuition;
+    if (t != null && _appliedIds.contains(t['id'])) {
+      return {...t, 'has_applied': true};
+    }
+    return t;
+  }
+
+  bool hasApplied(int id) => _appliedIds.contains(id);
   List<String> get cities => _cities;
   List<String> get areas => _areas;
   bool get isLoading => _isLoading;
@@ -97,7 +117,13 @@ class TuitionProvider with ChangeNotifier {
   Future<Map<String, dynamic>> applyForTuition(int tuitionId, String reference) async {
     try {
       final response = await _api.applyForTuition(tuitionId, reference);
-      return response.data;
+      final data = response.data;
+      if (data['success'] == true) {
+        // Remember locally so the UI shows "Already Applied" right away.
+        _appliedIds.add(tuitionId);
+        notifyListeners();
+      }
+      return data;
     } catch (e) {
       return {'success': false, 'message': 'Failed to apply'};
     }

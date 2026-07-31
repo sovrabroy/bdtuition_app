@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../dashboard/home_screen.dart';
@@ -18,6 +19,46 @@ class _LoginScreenState extends State<LoginScreen> {
   final _loginController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _rememberMe = false;
+
+  // Keys used to persist the saved login so it can be auto-filled after logout.
+  static const _kRememberFlag = 'remember_me';
+  static const _kSavedLogin = 'saved_login';
+  static const _kSavedPassword = 'saved_password';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  /// Restores the saved login/password (if the user chose to remember them) so
+  /// the fields are pre-filled after a logout.
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_kRememberFlag) ?? false) {
+      if (!mounted) return;
+      setState(() {
+        _rememberMe = true;
+        _loginController.text = prefs.getString(_kSavedLogin) ?? '';
+        _passwordController.text = prefs.getString(_kSavedPassword) ?? '';
+      });
+    }
+  }
+
+  /// Saves or clears the credentials based on the "Remember me" checkbox.
+  Future<void> _persistCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberMe) {
+      await prefs.setBool(_kRememberFlag, true);
+      await prefs.setString(_kSavedLogin, _loginController.text.trim());
+      await prefs.setString(_kSavedPassword, _passwordController.text);
+    } else {
+      await prefs.remove(_kRememberFlag);
+      await prefs.remove(_kSavedLogin);
+      await prefs.remove(_kSavedPassword);
+    }
+  }
 
   @override
   void dispose() {
@@ -38,6 +79,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
+      // Persist (or clear) the credentials before leaving the screen.
+      await _persistCredentials();
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -111,18 +155,39 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
 
-                // Forgot Password
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                // Remember me + Forgot Password
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _rememberMe = !_rememberMe),
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: _rememberMe,
+                              onChanged: (v) =>
+                                  setState(() => _rememberMe = v ?? false),
+                            ),
+                            const Flexible(
+                              child: Text(
+                                'Remember me',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    child: const Text('Forgot Password?'),
-                  ),
+                    TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                      ),
+                      child: const Text('Forgot Password?'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
 

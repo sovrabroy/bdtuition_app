@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../models/demo_class.dart';
 import '../../providers/demo_provider.dart';
 import '../../services/security_service.dart';
+import '../../services/api_service.dart';
 
 class AddDemoScreen extends StatefulWidget {
   const AddDemoScreen({super.key});
@@ -17,12 +19,90 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
   final _codeCtrl = TextEditingController();
   final _guardianCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+  final ApiService _api = ApiService();
 
   DateTime _scheduledAt = DateTime.now().add(const Duration(hours: 1));
   double? _guardianLat;
   double? _guardianLng;
   bool _pinning = false;
   bool _saving = false;
+  bool _looking = false;
+  // Set once a lookup succeeds so the "copy code" affordance can appear.
+  bool _codeResolved = false;
+
+  /// Tolerant multi-key lookup: returns the first non-empty value among [keys].
+  String _pick(Map<String, dynamic> data, List<String> keys) {
+    for (final k in keys) {
+      final v = data[k];
+      if (v != null && v.toString().trim().isNotEmpty) return v.toString().trim();
+    }
+    return '';
+  }
+
+  /// Looks up an existing tuition by the entered code and auto-fills the
+  /// guardian/address fields from it. Nothing is faked — if the code isn't
+  /// found or the request fails, the user is told and fields are left alone.
+  Future<void> _lookupCode() async {
+    final code = _codeCtrl.text.trim();
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a tuition code first.')),
+      );
+      return;
+    }
+    setState(() => _looking = true);
+    try {
+      final response = await _api.getTuitions(tuitionCode: code);
+      final data = response.data;
+      final list = (data is Map && data['success'] == true)
+          ? (data['data'] as List? ?? [])
+          : const [];
+      if (list.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No tuition found for code "$code".')),
+        );
+        return;
+      }
+      final t = Map<String, dynamic>.from(list.first as Map);
+      final area = _pick(t, ['area', 'location']);
+      final city = _pick(t, ['city', 'district']);
+      final guardian =
+          _pick(t, ['guardian_name', 'guardian', 'name', 'contact_name']);
+      final address = _pick(t, ['address', 'full_address', 'tuition_address']);
+      if (!mounted) return;
+      setState(() {
+        _codeResolved = true;
+        if (guardian.isNotEmpty) _guardianCtrl.text = guardian;
+        if (address.isNotEmpty) {
+          _addressCtrl.text = address;
+        } else if (area.isNotEmpty || city.isNotEmpty) {
+          _addressCtrl.text = [area, city].where((s) => s.isNotEmpty).join(', ');
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tuition details imported.')),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lookup failed. Check your connection.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _looking = false);
+    }
+  }
+
+  Future<void> _copyCode() async {
+    final code = _codeCtrl.text.trim();
+    if (code.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: code));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Copied "$code" to clipboard.')),
+    );
+  }
 
   @override
   void dispose() {
@@ -114,11 +194,37 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
           children: [
             TextFormField(
               controller: _codeCtrl,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Tuition Code',
-                prefixIcon: Icon(Icons.tag),
-                border: OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.tag),
+                border: const OutlineInputBorder(),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_codeResolved)
+                      IconButton(
+                        tooltip: 'Copy code',
+                        icon: const Icon(Icons.copy, size: 20),
+                        onPressed: _copyCode,
+                      ),
+                    _looking
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 12),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            tooltip: 'Import details from code',
+                            icon: const Icon(Icons.download_for_offline),
+                            onPressed: _lookupCode,
+                          ),
+                  ],
+                ),
               ),
+              onFieldSubmitted: (_) => _lookupCode(),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),

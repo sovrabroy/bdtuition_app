@@ -6,7 +6,11 @@ import '../../providers/teacher_provider.dart';
 import '../tuitions/tuition_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  /// Optional callback so tapping a stat card can switch the bottom-nav tab
+  /// owned by HomeScreen. Left null when the screen is used standalone.
+  final void Function(int tabIndex)? onNavigateTab;
+
+  const DashboardScreen({super.key, this.onNavigateTab});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -118,6 +122,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       label: 'Active Tuitions',
                       value: '${data['active_assignments'] ?? 0}',
                       color: AppTheme.primaryColor,
+                      onTap: () => widget.onNavigateTab?.call(3),
                     ),
                     const SizedBox(width: 12),
                     _StatCard(
@@ -125,6 +130,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       label: 'Available',
                       value: '${data['available_tuitions'] ?? 0}',
                       color: AppTheme.successColor,
+                      onTap: () => widget.onNavigateTab?.call(1),
                     ),
                   ],
                 ),
@@ -136,6 +142,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       label: 'Total Paid',
                       value: '৳${data['total_earnings'] ?? 0}',
                       color: AppTheme.accentColor,
+                      onTap: () => widget.onNavigateTab?.call(4),
                     ),
                     const SizedBox(width: 12),
                     _StatCard(
@@ -143,6 +150,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       label: 'Pending Due',
                       value: '৳${data['pending_due'] ?? 0}',
                       color: AppTheme.errorColor,
+                      onTap: () => widget.onNavigateTab?.call(4),
                     ),
                   ],
                 ),
@@ -222,27 +230,56 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
+  final VoidCallback? onTap;
 
-  const _StatCard({required this.icon, required this.label, required this.value, required this.color});
+  const _StatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-          ],
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+            ),
+            child: Column(
+              children: [
+                Icon(icon, color: color, size: 28),
+                const SizedBox(height: 8),
+                Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+                const SizedBox(height: 4),
+                Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                if (onTap != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('View',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: color,
+                              fontWeight: FontWeight.w600)),
+                      Icon(Icons.chevron_right, size: 14, color: color),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );

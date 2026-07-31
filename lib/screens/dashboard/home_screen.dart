@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/teacher_provider.dart';
+import '../../services/nearby_tuition_notifier.dart';
 import '../auth/login_screen.dart';
 import 'dashboard_screen.dart';
 import '../tuitions/tuition_list_screen.dart';
+import '../tuitions/tuition_detail_screen.dart';
 import '../profile/profile_screen.dart';
 import '../guardians/guardian_list_screen.dart';
 import '../payments/payment_screen.dart';
@@ -21,25 +23,112 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final _screens = const [
-    DashboardScreen(),
-    TuitionListScreen(),
-    DemoDashboardScreen(),
-    GuardianListScreen(),
-    PaymentScreen(),
-    ProfileScreen(),
-  ];
+  void _goToTab(int index) {
+    if (index >= 0 && index < 6) {
+      setState(() => _currentIndex = index);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<TeacherProvider>(context, listen: false).loadDashboard();
+      _startNearbyNotifier();
     });
   }
 
   @override
+  void dispose() {
+    NearbyTuitionNotifier.instance.onMatch = null;
+    NearbyTuitionNotifier.instance.stop();
+    super.dispose();
+  }
+
+  /// Starts the in-app watcher that pops up when a tuition in the teacher's
+  /// expected area appears. Offline/system notifications are handled separately
+  /// (see NOTIFICATIONS_SETUP.md).
+  void _startNearbyNotifier() {
+    final notifier = NearbyTuitionNotifier.instance;
+    notifier.onMatch = _showNearbyPopup;
+    notifier.start();
+  }
+
+  void _showNearbyPopup(Map<String, dynamic> t) {
+    if (!mounted) return;
+    final area = (t['area'] ?? t['location'] ?? '').toString();
+    final city = (t['city'] ?? t['district'] ?? '').toString();
+    final code = (t['tuition_code'] ?? t['code'] ?? '').toString();
+    final salary = (t['salary'] ?? t['salary_amount'] ?? '').toString();
+    final id = t['id'];
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.notifications_active, color: AppTheme.primaryColor),
+            SizedBox(width: 10),
+            Expanded(child: Text('New Tuition Near You')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (code.isNotEmpty)
+              Text(code,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 6),
+            Text(
+              [area, city].where((s) => s.isNotEmpty).join(', '),
+              style: const TextStyle(color: AppTheme.textSecondary),
+            ),
+            if (salary.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text('৳$salary/month',
+                  style: const TextStyle(
+                      color: AppTheme.successColor,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Dismiss'),
+          ),
+          if (id is int)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TuitionDetailScreen(tuitionId: id),
+                  ),
+                );
+              },
+              child: const Text('View'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final screens = [
+      DashboardScreen(onNavigateTab: _goToTab),
+      const TuitionListScreen(),
+      const DemoDashboardScreen(),
+      const GuardianListScreen(),
+      const PaymentScreen(),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('BDTuition'),
@@ -59,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: _screens[_currentIndex],
+      body: screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (i) => setState(() => _currentIndex = i),

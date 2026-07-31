@@ -133,7 +133,7 @@ class TuitionProvider with ChangeNotifier {
     try {
       final response = await _api.getCities();
       if (response.data['success'] == true) {
-        _cities = List<String>.from(response.data['data']);
+        _cities = List<String>.from(response.data['data'])..sort();
         notifyListeners();
       }
     } catch (_) {}
@@ -143,7 +143,7 @@ class TuitionProvider with ChangeNotifier {
     try {
       final response = await _api.getAreas(city);
       if (response.data['success'] == true) {
-        _areas = List<String>.from(response.data['data']);
+        _areas = List<String>.from(response.data['data'])..sort();
         notifyListeners();
       }
     } catch (_) {}

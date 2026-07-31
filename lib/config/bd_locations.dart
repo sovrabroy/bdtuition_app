@@ -289,5 +289,12 @@ const Map<String, List<String>> kBdLocations = {
   ],
 };
 
-/// Ordered list of all 64 districts (city dropdown source).
-final List<String> kBdDistricts = kBdLocations.keys.toList();
+/// Ordered list of all 64 districts (city dropdown source), sorted A→Z.
+final List<String> kBdDistricts = kBdLocations.keys.toList()..sort();
+
+/// Areas for a district, sorted alphabetically (A→Z) for the dropdowns.
+List<String> kBdAreasFor(String? city) {
+  final areas = List<String>.from(kBdLocations[city] ?? const []);
+  areas.sort();
+  return areas;
+}

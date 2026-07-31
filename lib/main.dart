@@ -1,15 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/tuition_provider.dart';
 import 'providers/teacher_provider.dart';
 import 'providers/demo_provider.dart';
 import 'providers/guardian_provider.dart';
+import 'services/push_service.dart';
 import 'screens/auth/splash_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Push notifications (Feature 5 offline half). Wrapped so a Firebase misconfig
+  // can never stop the app from launching.
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    await PushService.instance.init();
+  } catch (e) {
+    debugPrint('Firebase/push init skipped: $e');
+  }
   runApp(const BDTuitionApp());
 }
 

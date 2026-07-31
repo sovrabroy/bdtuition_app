@@ -41,6 +41,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _addressCtrl = TextEditingController();
   final _sscGpaCtrl = TextEditingController();
   final _hscGpaCtrl = TextEditingController();
+  // Teaching preference (asked at registration).
+  final _expectedClassCtrl = TextEditingController();
+  final _expectedSubjectCtrl = TextEditingController();
+  final _expectedSalaryCtrl = TextEditingController();
 
   String _gender = 'Male';
   String _medium = 'Bangla medium';
@@ -50,6 +54,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _city = 'Dhaka';
   String? _area;
   List<String> _expectedAreas = [];
+  // Teaching preference dropdown state.
+  String _expectedMedium = 'Bangla medium';
+  String _dayPerWeek = '3';
 
   // Image files
   File? _universityIdPhoto;
@@ -102,11 +109,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       'city': _city,
       'area': _area ?? '',
       'expected_area': _expectedAreas,
+      // Teaching preference collected at registration.
+      'expected_class': _expectedClassCtrl.text.trim(),
+      'expected_subject': _expectedSubjectCtrl.text.trim(),
+      'expected_medium': _expectedMedium,
+      'day_per_week': _dayPerWeek,
+      'expected_salary': _expectedSalaryCtrl.text.trim(),
       'living_address': _addressCtrl.text.trim(),
       'father_name': _fatherNameCtrl.text.trim(),
-      'father_brother_phone': _fatherPhoneCtrl.text.trim(),
       'mother_name': _motherNameCtrl.text.trim(),
-      'mother_sister_phone': _motherPhoneCtrl.text.trim(),
       'local_guardian_phone': _localGuardianCtrl.text.trim(),
       'departmental_friend_phone': _deptFriendCtrl.text.trim(),
       'university_id_photo': await MultipartFile.fromFile(_universityIdPhoto!.path),
@@ -306,6 +317,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(labelText: 'HSC/A Level GPA *'),
                 ),
+                const SizedBox(height: 20),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Teaching Preference',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _expectedClassCtrl,
+                  decoration: const InputDecoration(labelText: 'Expected Class * (e.g. Class 6-10, HSC)'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _expectedSubjectCtrl,
+                  decoration: const InputDecoration(labelText: 'Expected Subject * (e.g. Math, Physics)'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _expectedMedium,
+                  decoration: const InputDecoration(labelText: 'Expected Medium *'),
+                  items: ['Bangla medium', 'English version', 'English medium', 'Madrasa']
+                      .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _expectedMedium = v!),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _dayPerWeek,
+                  decoration: const InputDecoration(labelText: 'Day per Week *'),
+                  items: ['1', '2', '3', '4', '5', '6', '7']
+                      .map((d) => DropdownMenuItem(value: d, child: Text('$d day/week')))
+                      .toList(),
+                  onChanged: (v) => setState(() => _dayPerWeek = v!),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _expectedSalaryCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Expected Salary * (৳ per month)'),
+                ),
               ],
             ),
           ),
@@ -336,7 +387,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   isExpanded: true,
                   hint: const Text('Select area'),
                   decoration: const InputDecoration(labelText: 'Area *'),
-                  items: (kBdLocations[_city] ?? [])
+                  items: kBdAreasFor(_city)
                       .map((a) => DropdownMenuItem(value: a, child: Text(a)))
                       .toList(),
                   onChanged: (v) => setState(() => _area = v),
@@ -353,7 +404,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 4,
-                  children: (kBdLocations[_city] ?? []).map((a) {
+                  children: kBdAreasFor(_city).map((a) {
                     final selected = _expectedAreas.contains(a);
                     return FilterChip(
                       label: Text(a),
@@ -365,11 +416,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 12),
                 TextFormField(controller: _fatherNameCtrl, decoration: const InputDecoration(labelText: 'Father Name *')),
                 const SizedBox(height: 12),
-                TextFormField(controller: _fatherPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "Father/Brother Phone *")),
-                const SizedBox(height: 12),
                 TextFormField(controller: _motherNameCtrl, decoration: const InputDecoration(labelText: 'Mother Name *')),
-                const SizedBox(height: 12),
-                TextFormField(controller: _motherPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "Mother/Sister Phone *")),
                 const SizedBox(height: 12),
                 TextFormField(controller: _localGuardianCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Local Guardian Phone *')),
                 const SizedBox(height: 12),
@@ -411,6 +458,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _deptFriendCtrl.dispose(); _universityCtrl.dispose(); _departmentCtrl.dispose();
     _schoolCtrl.dispose(); _collegeCtrl.dispose();
     _addressCtrl.dispose(); _sscGpaCtrl.dispose(); _hscGpaCtrl.dispose();
+    _expectedClassCtrl.dispose(); _expectedSubjectCtrl.dispose(); _expectedSalaryCtrl.dispose();
     super.dispose();
   }
 }

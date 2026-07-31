@@ -24,35 +24,29 @@ it just works.
 A notification that appears in the phone's top notification tray **while the app
 isn't running** cannot be done from the app alone. Android only delivers those
 through **Firebase Cloud Messaging (FCM)**, and your server has to send the push.
-This is why it isn't finished yet — it needs your Firebase project and a small
-backend addition on cPanel. Here is the exact checklist.
 
-### Step 1 — Create a Firebase project (free)
-1. Go to https://console.firebase.google.com → **Add project** → name it e.g. `BDTuition`.
-2. Add an **Android app**. Package name must match the app's. Find it in
-   `android/app/build.gradle` under `applicationId`.
-3. Download the generated **`google-services.json`**.
-4. Place it at `android/app/google-services.json` in the repo and commit it.
+### ✅ Done on the app side (shipped in this update)
+- `google-services.json` is in `android/app/` (Firebase project `bdtuition-1fad3`).
+- Gradle wired: `com.google.gms.google-services` plugin, core-library desugaring,
+  `minSdk` raised to 23, desugar dependency.
+- Packages added: `firebase_core`, `firebase_messaging`, `flutter_local_notifications`.
+- `lib/services/push_service.dart` — initialises FCM, creates the "Tuition Alerts"
+  notification channel, shows foreground alerts, and sends the device token to the
+  backend `POST /fcm-token` after login (and on token refresh).
+- `AndroidManifest.xml` — `POST_NOTIFICATIONS` permission for Android 13+.
+- `main.dart` — Firebase init + background handler, all guarded so a misconfig
+  can never stop the app from launching.
 
-### Step 2 — Get the server key
-1. Firebase Console → **Project settings** → **Cloud Messaging**.
-2. Copy the **Server key** (or set up the newer HTTP v1 service-account JSON).
-   You'll paste this into the cPanel backend in Step 5.
+Once the APK rebuilds from GitHub Actions, each logged-in device registers its
+token automatically. **All that's left is the two cPanel backend pieces below.**
 
-### Step 3 — Tell me it's done
-Once `google-services.json` is in the repo, send me a message. I will then:
-- Add `firebase_messaging` + `flutter_local_notifications` to `pubspec.yaml`.
-- Add the Gradle plugin lines to `android/build.gradle` and `android/app/build.gradle`.
-- Create a `PushService` that registers the device token and shows tray
-  notifications.
-- Send the token to your existing `/fcm-token` endpoint (already stubbed in
-  `ApiConfig`).
+> **Confirmed against the live DB (`mohaqtzn_wp37`):**
+> - `teachers` table → `expected_area` (teacher's desired area), plus `fcm_token` (added below)
+> - `tuitions` table → `area`, `tuition_code`, `salary`
+> The code below already uses these exact names — no adjustment needed.
 
-> I'm holding off on adding these packages until `google-services.json` exists,
-> because adding Firebase without it **breaks the GitHub Actions build**.
-
-### Step 4 — Backend: store each teacher's device token (cPanel)
-Add a column to the teachers table (adjust the table name if different):
+### Step 1 — Backend: store each teacher's device token (cPanel)
+Add the `fcm_token` column to the `teachers` table:
 
 ```sql
 ALTER TABLE teachers ADD COLUMN fcm_token VARCHAR(255) NULL;
@@ -62,47 +56,48 @@ Add the endpoint the app already calls (`POST /api/fcm-token`) to save it:
 
 ```php
 // routes/api.php  (panel.bdtuition.com)
-Route::middleware('auth:sanctum')->post('/fcm-token', function (Request $r) {
-    $r->user()->update(['fcm_token' => $r->input('token')]);
+Route::middleware('auth:sanctum')->post('/fcm-token', function (\Illuminate\Http\Request $request) {
+    $request->user()->update(['fcm_token' => $request->input('token')]);
     return response()->json(['success' => true]);
 });
 ```
 
-### Step 5 — Backend: send a push when a matching tuition is posted (cPanel)
-When a new tuition is created, find teachers whose `expected_area` contains the
-tuition's area and push to their `fcm_token`. Sketch:
+### Step 2 — Backend: send a push when a matching tuition is posted (cPanel)
+Where a new tuition is saved (the tuition store controller), add this right
+after the tuition is created. It finds teachers whose `expected_area` contains
+the tuition's `area` and pushes to their `fcm_token`:
 
 ```php
-// After a tuition is saved (e.g. in the tuition store controller)
 $area = $tuition->area;
 
-// Adjust the column/match to however expected_area is stored (CSV vs JSON).
-$teachers = Teacher::whereNotNull('fcm_token')
+$teachers = \DB::table('teachers')
+    ->whereNotNull('fcm_token')
     ->where('expected_area', 'like', "%{$area}%")
     ->get();
 
 foreach ($teachers as $teacher) {
-    Http::withHeaders([
+    \Illuminate\Support\Facades\Http::withHeaders([
         'Authorization' => 'key=' . env('FCM_SERVER_KEY'),
         'Content-Type'  => 'application/json',
     ])->post('https://fcm.googleapis.com/fcm/send', [
         'to' => $teacher->fcm_token,
         'notification' => [
-            'title' => 'New Tuition Near You',
-            'body'  => "{$tuition->tuition_code} — {$tuition->area}, ৳{$tuition->salary}",
+            'title' => 'নতুন টিউশন আপনার এলাকায়!',
+            'body'  => "{$tuition->tuition_code} — {$tuition->area}, ৳{$tuition->salary}/মাস",
         ],
-        'data' => ['tuition_id' => (string) $tuition->id],
+        'data' => [
+            'tuition_id'   => (string) $tuition->id,
+            'tuition_code' => (string) $tuition->tuition_code,
+            'area'         => (string) $tuition->area,
+        ],
     ]);
 }
 ```
 
-Add `FCM_SERVER_KEY=...` (from Step 2) to the cPanel `.env`.
+Get `FCM_SERVER_KEY` from Firebase Console → **Project settings** → **Cloud
+Messaging** → server key, and add `FCM_SERVER_KEY=...` to the cPanel `.env`.
 
-> **Column names to confirm:** `expected_area`, `area`, `tuition_code`, `salary`,
-> and the teachers table name. Change them in the SQL/PHP above if yours differ.
-
-### Step 6 — Rebuild
-After my code changes + your backend deploy, push to GitHub so Actions rebuilds
-the APK. Install it, log in, and the token registers automatically. Post a test
-tuition in an expected area to confirm the tray notification arrives with the
-app fully closed.
+### Step 3 — Rebuild & test
+After your backend deploy, the APK from GitHub Actions already has the app side.
+Install it, log in (token registers automatically), then post a test tuition in
+an expected area to confirm the tray notification arrives with the app fully closed.

@@ -214,4 +214,13 @@ class ApiService {
   Future<Response> processRefund(int assignmentId, Map<String, dynamic> data) async {
     return await _dio.post('${ApiConfig.refunds}/$assignmentId', data: data);
   }
+
+  // ==================== PUSH NOTIFICATIONS ====================
+
+  /// Registers this device's FCM token with the backend so the server can push
+  /// "new tuition near you" notifications while the app is closed. Backend
+  /// endpoint (POST /fcm-token) is documented in NOTIFICATIONS_SETUP.md.
+  Future<Response> registerFcmToken(String token) async {
+    return await _dio.post(ApiConfig.fcmToken, data: {'token': token});
+  }
 }

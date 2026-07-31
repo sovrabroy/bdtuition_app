@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import '../services/api_service.dart';
+import '../services/push_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _api = ApiService();
@@ -27,6 +28,8 @@ class AuthProvider with ChangeNotifier {
     final teacherJson = prefs.getString('teacher_data');
     if (teacherJson != null && _api.isLoggedIn) {
       _teacher = json.decode(teacherJson);
+      // Returning logged-in user: make sure the backend has this device's token.
+      PushService.instance.registerWithBackendIfLoggedIn();
     }
     _isInitialized = true;
     notifyListeners();
@@ -47,6 +50,9 @@ class AuthProvider with ChangeNotifier {
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('teacher_data', json.encode(_teacher));
+
+        // Register this device for "nearby tuition" push notifications.
+        PushService.instance.registerWithBackendIfLoggedIn();
 
         _isLoading = false;
         notifyListeners();
@@ -100,6 +106,9 @@ class AuthProvider with ChangeNotifier {
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('teacher_data', json.encode(_teacher));
+
+        // Register this device for "nearby tuition" push notifications.
+        PushService.instance.registerWithBackendIfLoggedIn();
 
         _isLoading = false;
         notifyListeners();

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "98555773695",
+    "project_id": "bdtuition-1fad3",
+    "storage_bucket": "bdtuition-1fad3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:98555773695:android:3ed89de6628af615cb42ca",
+        "android_client_info": {
+          "package_name": "com.example.bdtuition_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBG0O7YQKMOMOF5Y5t0fO7IdW1vW012ajY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

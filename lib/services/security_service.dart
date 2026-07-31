@@ -84,9 +84,7 @@ class SecurityService {
     }
 
     return Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.best,
-      ),
+      desiredAccuracy: LocationAccuracy.best,
     );
   }
 

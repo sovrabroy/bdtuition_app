@@ -34,15 +34,26 @@ class WelcomeScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 24),
-                const Icon(Icons.school, size: 64, color: AppTheme.primaryColor),
-                const SizedBox(height: 12),
-                const Text(
-                  'BDTuition',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryColor,
+                // App logo. Falls back to the old icon+text if the image
+                // asset is missing, so the screen never breaks.
+                Image.asset(
+                  'assets/logo.png',
+                  height: 120,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Column(
+                    children: const [
+                      Icon(Icons.school, size: 64, color: AppTheme.primaryColor),
+                      SizedBox(height: 12),
+                      Text(
+                        'BDTuition',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 40),

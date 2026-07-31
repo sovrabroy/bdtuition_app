@@ -36,6 +36,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _deptFriendCtrl = TextEditingController();
   final _universityCtrl = TextEditingController();
   final _departmentCtrl = TextEditingController();
+  final _schoolCtrl = TextEditingController();
+  final _collegeCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _sscGpaCtrl = TextEditingController();
   final _hscGpaCtrl = TextEditingController();
@@ -89,6 +91,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       'gender': _gender,
       'university_name': _universityCtrl.text.trim(),
       'department_name': _departmentCtrl.text.trim(),
+      'school_name': _schoolCtrl.text.trim(),
+      'college_name': _collegeCtrl.text.trim(),
       'academic_year': _academicYear,
       'ssc_group': _sscGroup,
       'ssc_gpa': _sscGpaCtrl.text.trim(),
@@ -247,6 +251,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             isActive: _currentStep >= 1,
             content: Column(
               children: [
+                TextFormField(controller: _schoolCtrl, decoration: const InputDecoration(labelText: 'School Name *')),
+                const SizedBox(height: 12),
+                TextFormField(controller: _collegeCtrl, decoration: const InputDecoration(labelText: 'College Name *')),
+                const SizedBox(height: 12),
                 TextFormField(controller: _universityCtrl, decoration: const InputDecoration(labelText: 'University Name *')),
                 const SizedBox(height: 12),
                 TextFormField(controller: _departmentCtrl, decoration: const InputDecoration(labelText: 'Department *')),
@@ -326,6 +334,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 DropdownButtonFormField<String>(
                   value: _area,
                   isExpanded: true,
+                  hint: const Text('Select area'),
                   decoration: const InputDecoration(labelText: 'Area *'),
                   items: (kBdLocations[_city] ?? [])
                       .map((a) => DropdownMenuItem(value: a, child: Text(a)))
@@ -400,6 +409,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _confirmPasswordCtrl.dispose(); _fatherNameCtrl.dispose(); _fatherPhoneCtrl.dispose();
     _motherNameCtrl.dispose(); _motherPhoneCtrl.dispose(); _localGuardianCtrl.dispose();
     _deptFriendCtrl.dispose(); _universityCtrl.dispose(); _departmentCtrl.dispose();
+    _schoolCtrl.dispose(); _collegeCtrl.dispose();
     _addressCtrl.dispose(); _sscGpaCtrl.dispose(); _hscGpaCtrl.dispose();
     super.dispose();
   }

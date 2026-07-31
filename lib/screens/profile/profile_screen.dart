@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../config/api_config.dart';
+import '../../config/bd_locations.dart';
 import '../../providers/teacher_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -85,6 +86,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     '20000',
   ];
 
+  // Academic year options (same set used on the registration screen).
+  static const List<String> kAcademicYearOptions = [
+    '1st year',
+    '2nd year',
+    '3rd year',
+    '4th year',
+    '5th year/Masters',
+    'Completed',
+  ];
+
   // Selected values for the Tuition Preferences dropdowns.
   String? _expectedClass;
   final List<String> _expectedSubjects = [];
@@ -92,7 +103,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _maxDaysPerWeek;
   String? _minSalary;
 
+  // Selected academic year for the Education section.
+  String? _academicYear;
+
+  // SSC / HSC group selections (groups are hardcoded; GPA is typed manually).
+  String? _sscGroup;
+  String? _hscGroup;
+
   // Editable field controllers
+  final _departmentController = TextEditingController();
+  final _sscGpaController = TextEditingController();
+  final _hscGpaController = TextEditingController();
   final _schoolNameController = TextEditingController();
   final _collegeNameController = TextEditingController();
   final _universityNameController = TextEditingController();
@@ -128,6 +149,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             .where((s) => allSubjects.contains(s)),
       );
 
+    _departmentController.text =
+        profile['department_name'] ?? profile['department'] ?? '';
+    _academicYear = _matchOption(
+        profile['academic_year']?.toString(), kAcademicYearOptions);
+
+    _sscGroup = _matchOption(profile['ssc_group']?.toString(), kAcademicGroups);
+    _hscGroup = _matchOption(profile['hsc_group']?.toString(), kAcademicGroups);
+    _sscGpaController.text = profile['ssc_gpa']?.toString() ?? '';
+    _hscGpaController.text = profile['hsc_gpa']?.toString() ?? '';
+
     _schoolNameController.text = profile['school_name'] ?? '';
     _collegeNameController.text = profile['college_name'] ?? '';
     _universityNameController.text = profile['university_name'] ?? '';
@@ -152,6 +183,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'expected_medium': _expectedMedium ?? '',
       'day_per_week': _maxDaysPerWeek ?? '',
       'expected_salary': _minSalary ?? '',
+      'department_name': _departmentController.text.trim(),
+      'academic_year': _academicYear ?? '',
+      'ssc_group': _sscGroup ?? '',
+      'ssc_gpa': _sscGpaController.text.trim(),
+      'hsc_group': _hscGroup ?? '',
+      'hsc_gpa': _hscGpaController.text.trim(),
       'school_name': _schoolNameController.text.trim(),
       'college_name': _collegeNameController.text.trim(),
       'university_name': _universityNameController.text.trim(),
@@ -179,6 +216,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
+    _departmentController.dispose();
+    _sscGpaController.dispose();
+    _hscGpaController.dispose();
     _schoolNameController.dispose();
     _collegeNameController.dispose();
     _universityNameController.dispose();
@@ -367,6 +407,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             label: 'University Name',
                             controller: _universityNameController,
                           ),
+                          _EditableField(
+                            label: 'Department',
+                            controller: _departmentController,
+                          ),
+                          _DropdownField(
+                            label: 'Academic Year',
+                            value: _academicYear,
+                            options: kAcademicYearOptions,
+                            onChanged: (v) =>
+                                setState(() => _academicYear = v),
+                          ),
+                          _DropdownField(
+                            label: 'SSC/O Level Group',
+                            value: _sscGroup,
+                            options: kAcademicGroups,
+                            onChanged: (v) => setState(() => _sscGroup = v),
+                          ),
+                          _EditableField(
+                            label: 'SSC/O Level GPA',
+                            controller: _sscGpaController,
+                          ),
+                          _DropdownField(
+                            label: 'HSC/A Level Group',
+                            value: _hscGroup,
+                            options: kAcademicGroups,
+                            onChanged: (v) => setState(() => _hscGroup = v),
+                          ),
+                          _EditableField(
+                            label: 'HSC/A Level GPA',
+                            controller: _hscGpaController,
+                          ),
                         ]
                       : [
                           _InfoRow('School',
@@ -375,6 +446,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               profile['college_name'] ?? 'N/A'),
                           _InfoRow('University',
                               profile['university_name'] ?? 'N/A'),
+                          _InfoRow(
+                              'Department',
+                              profile['department_name'] ??
+                                  profile['department'] ??
+                                  'N/A'),
+                          _InfoRow('Academic Year',
+                              profile['academic_year'] ?? 'N/A'),
+                          _InfoRow('SSC/O Level Group',
+                              profile['ssc_group'] ?? 'N/A'),
+                          _InfoRow('SSC/O Level GPA',
+                              profile['ssc_gpa']?.toString() ?? 'N/A'),
+                          _InfoRow('HSC/A Level Group',
+                              profile['hsc_group'] ?? 'N/A'),
+                          _InfoRow('HSC/A Level GPA',
+                              profile['hsc_gpa']?.toString() ?? 'N/A'),
                         ],
                 ),
                 const SizedBox(height: 12),

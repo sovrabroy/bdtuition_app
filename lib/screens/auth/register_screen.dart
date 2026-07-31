@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
+import '../../config/bd_locations.dart';
 import '../../providers/auth_provider.dart';
 import 'otp_screen.dart';
 import 'package:image_picker/image_picker.dart';
@@ -36,14 +37,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _universityCtrl = TextEditingController();
   final _departmentCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
-  final _areaCtrl = TextEditingController();
+  final _sscGpaCtrl = TextEditingController();
+  final _hscGpaCtrl = TextEditingController();
 
   String _gender = 'Male';
   String _medium = 'Bangla medium';
   String _academicYear = '1st year';
+  String _sscGroup = 'Science';
+  String _hscGroup = 'Science';
   String _city = 'Dhaka';
+  String? _area;
   List<String> _expectedAreas = [];
-  final _expectedAreaCtrl = TextEditingController();
 
   // Image files
   File? _universityIdPhoto;
@@ -86,9 +90,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       'university_name': _universityCtrl.text.trim(),
       'department_name': _departmentCtrl.text.trim(),
       'academic_year': _academicYear,
+      'ssc_group': _sscGroup,
+      'ssc_gpa': _sscGpaCtrl.text.trim(),
+      'hsc_group': _hscGroup,
+      'hsc_gpa': _hscGpaCtrl.text.trim(),
       'medium': _medium,
       'city': _city,
-      'area': _areaCtrl.text.trim(),
+      'area': _area ?? '',
       'expected_area': _expectedAreas,
       'living_address': _addressCtrl.text.trim(),
       'father_name': _fatherNameCtrl.text.trim(),
@@ -121,14 +129,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void _addExpectedArea() {
-    final area = _expectedAreaCtrl.text.trim();
-    if (area.isNotEmpty && !_expectedAreas.contains(area)) {
-      setState(() {
+  void _toggleExpectedArea(String area) {
+    setState(() {
+      if (_expectedAreas.contains(area)) {
+        _expectedAreas.remove(area);
+      } else {
         _expectedAreas.add(area);
-        _expectedAreaCtrl.clear();
-      });
-    }
+      }
+    });
   }
 
   Widget _buildImagePicker(String label, File? file, String field) {
@@ -260,6 +268,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       .toList(),
                   onChanged: (v) => setState(() => _medium = v!),
                 ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _sscGroup,
+                  decoration: const InputDecoration(labelText: 'SSC/O Level Group *'),
+                  items: kAcademicGroups
+                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _sscGroup = v!),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _sscGpaCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'SSC/O Level GPA *'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _hscGroup,
+                  decoration: const InputDecoration(labelText: 'HSC/A Level Group *'),
+                  items: kAcademicGroups
+                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _hscGroup = v!),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _hscGpaCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'HSC/A Level GPA *'),
+                ),
               ],
             ),
           ),
@@ -272,29 +310,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
               children: [
                 DropdownButtonFormField<String>(
                   value: _city,
-                  decoration: const InputDecoration(labelText: 'City *'),
-                  items: ['Dhaka', 'Chittagong', 'Chattogram', 'Gazipur', 'Narayanganj', 'Savar']
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'City / District *'),
+                  items: kBdDistricts
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
-                  onChanged: (v) => setState(() => _city = v!),
+                  onChanged: (v) => setState(() {
+                    _city = v!;
+                    // Reset area selections when the city changes.
+                    _area = null;
+                    _expectedAreas = [];
+                  }),
                 ),
                 const SizedBox(height: 12),
-                TextFormField(controller: _areaCtrl, decoration: const InputDecoration(labelText: 'Area *')),
+                DropdownButtonFormField<String>(
+                  value: _area,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Area *'),
+                  items: (kBdLocations[_city] ?? [])
+                      .map((a) => DropdownMenuItem(value: a, child: Text(a)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _area = v),
+                ),
                 const SizedBox(height: 12),
                 TextFormField(controller: _addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Living Address *')),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: TextFormField(controller: _expectedAreaCtrl, decoration: const InputDecoration(labelText: 'Expected Area'))),
-                    IconButton(onPressed: _addExpectedArea, icon: const Icon(Icons.add_circle, color: AppTheme.primaryColor)),
-                  ],
+                const SizedBox(height: 16),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Expected Areas (select one or more)',
+                      style: TextStyle(fontWeight: FontWeight.w500)),
                 ),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
-                  children: _expectedAreas.map((a) => Chip(
-                    label: Text(a),
-                    onDeleted: () => setState(() => _expectedAreas.remove(a)),
-                  )).toList(),
+                  runSpacing: 4,
+                  children: (kBdLocations[_city] ?? []).map((a) {
+                    final selected = _expectedAreas.contains(a);
+                    return FilterChip(
+                      label: Text(a),
+                      selected: selected,
+                      onSelected: (_) => _toggleExpectedArea(a),
+                    );
+                  }).toList(),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(controller: _fatherNameCtrl, decoration: const InputDecoration(labelText: 'Father Name *')),
@@ -343,7 +400,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _confirmPasswordCtrl.dispose(); _fatherNameCtrl.dispose(); _fatherPhoneCtrl.dispose();
     _motherNameCtrl.dispose(); _motherPhoneCtrl.dispose(); _localGuardianCtrl.dispose();
     _deptFriendCtrl.dispose(); _universityCtrl.dispose(); _departmentCtrl.dispose();
-    _addressCtrl.dispose(); _areaCtrl.dispose(); _expectedAreaCtrl.dispose();
+    _addressCtrl.dispose(); _sscGpaCtrl.dispose(); _hscGpaCtrl.dispose();
     super.dispose();
   }
 }

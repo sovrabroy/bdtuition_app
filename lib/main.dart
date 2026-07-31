@@ -5,6 +5,7 @@ import 'providers/auth_provider.dart';
 import 'providers/tuition_provider.dart';
 import 'providers/teacher_provider.dart';
 import 'providers/demo_provider.dart';
+import 'providers/guardian_provider.dart';
 import 'screens/auth/splash_screen.dart';
 
 void main() {
@@ -23,6 +24,7 @@ class BDTuitionApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => TuitionProvider()),
         ChangeNotifierProvider(create: (_) => TeacherProvider()),
         ChangeNotifierProvider(create: (_) => DemoProvider()),
+        ChangeNotifierProvider(create: (_) => GuardianProvider()),
       ],
       child: MaterialApp(
         title: 'BDTuition',

@@ -9,6 +9,7 @@ import '../../providers/demo_provider.dart';
 import 'add_demo_screen.dart';
 import 'check_in_screen.dart';
 import 'checkin_history_screen.dart';
+import 'visit_proof_screen.dart';
 
 class DemoDashboardScreen extends StatefulWidget {
   const DemoDashboardScreen({super.key});
@@ -319,13 +320,21 @@ class _DemoDashboardScreenState extends State<DemoDashboardScreen> {
             ],
             if (demo.checkIns.isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(
-                '${demo.checkIns.length} check-in(s) recorded',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.successColor,
-                  fontWeight: FontWeight.w500,
-                ),
+              Row(
+                children: [
+                  const Icon(Icons.verified,
+                      size: 14, color: AppTheme.successColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${demo.genuineVisitDays} genuine visit day(s) in 30 days'
+                    ' • ${demo.checkIns.length} check-in(s)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.successColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ],
             const SizedBox(height: 10),
@@ -350,6 +359,20 @@ class _DemoDashboardScreenState extends State<DemoDashboardScreen> {
                   ),
               ],
             ),
+            if (demo.checkIns.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _openVisitProof(demo),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primaryColor,
+                  ),
+                  icon: const Icon(Icons.fact_check, size: 18),
+                  label: const Text('Visit Proof (30 days)'),
+                ),
+              ),
+            ],
             if (isActive) ...[
               const SizedBox(height: 6),
               Row(
@@ -441,6 +464,13 @@ class _DemoDashboardScreenState extends State<DemoDashboardScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => CheckInScreen(demo: demo)),
+    );
+  }
+
+  Future<void> _openVisitProof(DemoClass demo) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => VisitProofScreen(demoId: demo.id)),
     );
   }
 

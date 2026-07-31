@@ -20,10 +20,29 @@ class DemoStorage {
           .map((e) => DemoClass.fromJson(Map<String, dynamic>.from(e)))
           .toList();
       demos.sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
+      // Rolling window: we only keep the last 30 days of check-in data.
+      final pruned = _pruneOldCheckIns(demos);
+      if (pruned) {
+        await _saveAll(demos);
+      }
       return demos;
     } catch (_) {
       return [];
     }
+  }
+
+  /// Drop check-ins older than [DemoClass.windowDays] days. Returns true when
+  /// anything was removed (so the caller can persist the trimmed data).
+  bool _pruneOldCheckIns(List<DemoClass> demos) {
+    final cutoff =
+        DateTime.now().subtract(const Duration(days: DemoClass.windowDays));
+    var changed = false;
+    for (final d in demos) {
+      final before = d.checkIns.length;
+      d.checkIns.removeWhere((c) => c.time.isBefore(cutoff));
+      if (d.checkIns.length != before) changed = true;
+    }
+    return changed;
   }
 
   Future<void> _saveAll(List<DemoClass> demos) async {

@@ -15,12 +15,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isEditing = false;
   bool _isSaving = false;
 
+  // Hardcoded option lists for the Tuition Preferences dropdowns.
+  static const List<String> kClassOptions = [
+    'Zero to Class 2',
+    'Class 3 to Class 5',
+    'Class 6 to Class 8',
+    'SSC / O Level (Class 9 & 10)',
+    'HSC / A Level (Class 11 & 12)',
+    'University Admission Test',
+    'Honours Level Student',
+  ];
+
+  static const Map<String, List<String>> kSubjectGroups = {
+    'Common': ['General Math', 'English', 'Bangla', 'ICT'],
+    'Science': ['Higher Math', 'Physics', 'Chemistry', 'Biology', 'Statistics'],
+    'Commerce': [
+      'Accounting',
+      'Finance',
+      'Marketing',
+      'Management',
+      'Economics',
+      'Statistics',
+    ],
+    'Arts': [
+      'Economics',
+      'Geography',
+      'Logic',
+      'Psychology',
+      'Sociology',
+      'History',
+      'Islamic History',
+    ],
+    'Special': [
+      'Quran',
+      'Spoken English',
+      'IELTS',
+      'Drawing & Hand Writing',
+      'Dance',
+      'Music',
+      'Guitar',
+    ],
+  };
+
+  static const List<String> kMediumOptions = [
+    'Bangla Medium',
+    'English Version / NC',
+    'British Curriculum',
+    'American Curriculum',
+    'IB Curriculum',
+    'Madrasa Curriculum',
+  ];
+
+  static const List<String> kDaysOptions = [
+    '1 day',
+    '2 days',
+    '3 days',
+    '4 days',
+    '5 days',
+    '6 days',
+    '7 days',
+  ];
+
+  static const List<String> kSalaryOptions = [
+    '2000 - 3000',
+    '4000 - 5000',
+    '6000 - 8000',
+    '8000 - 10000',
+    '12000 - 15000',
+    '20000',
+  ];
+
+  // Selected values for the Tuition Preferences dropdowns.
+  String? _expectedClass;
+  final List<String> _expectedSubjects = [];
+  String? _expectedMedium;
+  String? _maxDaysPerWeek;
+  String? _minSalary;
+
   // Editable field controllers
-  final _expectedClassController = TextEditingController();
-  final _expectedSubjectController = TextEditingController();
-  final _expectedMediumController = TextEditingController();
-  final _dayPerWeekController = TextEditingController();
-  final _expectedSalaryController = TextEditingController();
   final _schoolNameController = TextEditingController();
   final _collegeNameController = TextEditingController();
   final _universityNameController = TextEditingController();
@@ -36,11 +108,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _populateControllers(Map<String, dynamic> profile) {
-    _expectedClassController.text = profile['expected_class'] ?? '';
-    _expectedSubjectController.text = profile['expected_subject'] ?? '';
-    _expectedMediumController.text = profile['expected_medium'] ?? '';
-    _dayPerWeekController.text = '${profile['day_per_week'] ?? ''}';
-    _expectedSalaryController.text = '${profile['expected_salary'] ?? ''}';
+    // Seed dropdowns from saved values. Only accept a value that is one of the
+    // known options (so old free-text data doesn't break the dropdown).
+    _expectedClass = _matchOption(profile['expected_class'], kClassOptions);
+    _expectedMedium = _matchOption(profile['expected_medium'], kMediumOptions);
+    _maxDaysPerWeek = _matchOption(
+        profile['day_per_week']?.toString(), kDaysOptions);
+    _minSalary =
+        _matchOption(profile['expected_salary']?.toString(), kSalaryOptions);
+
+    final allSubjects =
+        kSubjectGroups.values.expand((s) => s).toSet().toList();
+    _expectedSubjects
+      ..clear()
+      ..addAll(
+        (profile['expected_subject']?.toString() ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => allSubjects.contains(s)),
+      );
+
     _schoolNameController.text = profile['school_name'] ?? '';
     _collegeNameController.text = profile['college_name'] ?? '';
     _universityNameController.text = profile['university_name'] ?? '';
@@ -48,16 +135,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _permanentAddressController.text = profile['permanent_address'] ?? '';
   }
 
+  /// Returns [value] only if it exactly matches one of [options], else null.
+  String? _matchOption(String? value, List<String> options) {
+    if (value == null) return null;
+    final v = value.trim();
+    return options.contains(v) ? v : null;
+  }
+
   Future<void> _saveProfile() async {
     setState(() => _isSaving = true);
 
     final provider = Provider.of<TeacherProvider>(context, listen: false);
     final data = {
-      'expected_class': _expectedClassController.text.trim(),
-      'expected_subject': _expectedSubjectController.text.trim(),
-      'expected_medium': _expectedMediumController.text.trim(),
-      'day_per_week': _dayPerWeekController.text.trim(),
-      'expected_salary': _expectedSalaryController.text.trim(),
+      'expected_class': _expectedClass ?? '',
+      'expected_subject': _expectedSubjects.join(', '),
+      'expected_medium': _expectedMedium ?? '',
+      'day_per_week': _maxDaysPerWeek ?? '',
+      'expected_salary': _minSalary ?? '',
       'school_name': _schoolNameController.text.trim(),
       'college_name': _collegeNameController.text.trim(),
       'university_name': _universityNameController.text.trim(),
@@ -85,11 +179,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
-    _expectedClassController.dispose();
-    _expectedSubjectController.dispose();
-    _expectedMediumController.dispose();
-    _dayPerWeekController.dispose();
-    _expectedSalaryController.dispose();
     _schoolNameController.dispose();
     _collegeNameController.dispose();
     _universityNameController.dispose();
@@ -295,28 +384,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   title: 'Tuition Preferences',
                   children: _isEditing
                       ? [
-                          _EditableField(
+                          _DropdownField(
                             label: 'Expected Class',
-                            controller: _expectedClassController,
+                            value: _expectedClass,
+                            options: kClassOptions,
+                            onChanged: (v) =>
+                                setState(() => _expectedClass = v),
                           ),
-                          _EditableField(
-                            label: 'Expected Subject',
-                            controller: _expectedSubjectController,
+                          _SubjectPicker(
+                            selected: _expectedSubjects,
+                            groups: kSubjectGroups,
+                            onChanged: () => setState(() {}),
                           ),
-                          _EditableField(
+                          _DropdownField(
                             label: 'Expected Medium',
-                            controller: _expectedMediumController,
+                            value: _expectedMedium,
+                            options: kMediumOptions,
+                            onChanged: (v) =>
+                                setState(() => _expectedMedium = v),
                           ),
-                          _EditableField(
-                            label: 'Days Per Week',
-                            controller: _dayPerWeekController,
-                            keyboardType: TextInputType.number,
+                          _DropdownField(
+                            label: 'Maximum Days Per Week',
+                            value: _maxDaysPerWeek,
+                            options: kDaysOptions,
+                            onChanged: (v) =>
+                                setState(() => _maxDaysPerWeek = v),
                           ),
-                          _EditableField(
-                            label: 'Expected Salary',
-                            controller: _expectedSalaryController,
-                            keyboardType: TextInputType.number,
-                            prefix: '৳',
+                          _DropdownField(
+                            label: 'Minimum Salary',
+                            value: _minSalary,
+                            options: kSalaryOptions,
+                            onChanged: (v) => setState(() => _minSalary = v),
                           ),
                         ]
                       : [
@@ -326,9 +424,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               profile['expected_subject'] ?? 'N/A'),
                           _InfoRow('Expected Medium',
                               profile['expected_medium'] ?? 'N/A'),
-                          _InfoRow('Days Per Week',
+                          _InfoRow('Max Days Per Week',
                               '${profile['day_per_week'] ?? 'N/A'}'),
-                          _InfoRow('Expected Salary',
+                          _InfoRow('Minimum Salary',
                               '৳${profile['expected_salary'] ?? 'N/A'}'),
                         ],
                 ),
@@ -476,6 +574,108 @@ class _EditableField extends StatelessWidget {
           prefixText: prefix,
           isDense: true,
         ),
+      ),
+    );
+  }
+}
+
+/// A single-choice dropdown backed by a fixed list of options.
+class _DropdownField extends StatelessWidget {
+  final String label;
+  final String? value;
+  final List<String> options;
+  final ValueChanged<String?> onChanged;
+
+  const _DropdownField({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DropdownButtonFormField<String>(
+        value: value,
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+        ),
+        items: options
+            .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+            .toList(),
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+/// A grouped multi-select for subjects. A tutor can pick several subjects
+/// across the Common / Science / Commerce / Arts / Special groups.
+class _SubjectPicker extends StatelessWidget {
+  final List<String> selected;
+  final Map<String, List<String>> groups;
+  final VoidCallback onChanged;
+
+  const _SubjectPicker({
+    required this.selected,
+    required this.groups,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Expected Subject',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 6),
+          for (final entry in groups.entries) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 6, bottom: 2),
+              child: Text(
+                entry.key,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+            ),
+            Wrap(
+              spacing: 6,
+              runSpacing: 2,
+              children: entry.value.map((subject) {
+                final isSelected = selected.contains(subject);
+                return FilterChip(
+                  label: Text(subject, style: const TextStyle(fontSize: 12)),
+                  selected: isSelected,
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onSelected: (val) {
+                    if (val) {
+                      if (!selected.contains(subject)) selected.add(subject);
+                    } else {
+                      selected.remove(subject);
+                    }
+                    onChanged();
+                  },
+                );
+              }).toList(),
+            ),
+          ],
+        ],
       ),
     );
   }

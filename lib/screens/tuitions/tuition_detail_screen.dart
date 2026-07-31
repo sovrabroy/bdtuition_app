@@ -245,7 +245,12 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
                     ),
                   const SizedBox(height: 20),
 
-                  // Apply / Already Applied button
+                  // Apply / Already Applied button.
+                  // Show "Apply" by default. Only hide it if the teacher has
+                  // already applied, or if the backend EXPLICITLY says the
+                  // teacher is not eligible (can_apply == false). When the flag
+                  // is absent we still allow applying — the server does the
+                  // final eligibility check when the application is submitted.
                   if (tuition['has_applied'] == true)
                     Container(
                       width: double.infinity,
@@ -271,7 +276,35 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
                         ],
                       ),
                     )
-                  else if (tuition['can_apply'] == true)
+                  else if (tuition['can_apply'] == false)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _pick(tuition, [
+                              'apply_reason',
+                              'not_eligible_reason',
+                              'eligibility_message',
+                            ]).isNotEmpty
+                            ? _pick(tuition, [
+                                'apply_reason',
+                                'not_eligible_reason',
+                                'eligibility_message',
+                              ])
+                            : 'Not eligible to apply',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                      ),
+                    )
+                  else
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -281,24 +314,6 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           textStyle: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        'Not eligible to apply',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 15,
                         ),
                       ),
                     ),

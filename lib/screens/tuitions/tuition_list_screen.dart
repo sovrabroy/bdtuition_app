@@ -460,7 +460,9 @@ class _TuitionListScreenState extends State<TuitionListScreen> {
                           ),
                         );
                       },
-                      onApply: (tuition['can_apply'] == true &&
+                      // Allow applying by default; only block when the backend
+                      // explicitly says not eligible or already applied.
+                      onApply: (tuition['can_apply'] != false &&
                               tuition['has_applied'] != true)
                           ? () => _showApplyDialog(tuition['id'])
                           : null,

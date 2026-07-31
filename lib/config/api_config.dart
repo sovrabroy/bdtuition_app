@@ -40,4 +40,30 @@ class ApiConfig {
 
   // FCM
   static const String fcmToken = '/fcm-token';
+
+  /// Resolve a photo/document path returned by the API into a full URL.
+  /// Handles: already-absolute URLs, paths that already include "uploads/",
+  /// and bare filenames (which get the teacher-documents base prefixed).
+  /// Returns null when there is nothing usable to show.
+  static String? resolveImageUrl(dynamic path) {
+    if (path == null) return null;
+    var p = path.toString().trim();
+    if (p.isEmpty || p.toLowerCase() == 'null') return null;
+
+    // Already a full URL.
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
+
+    // Normalise leading slashes.
+    while (p.startsWith('/')) {
+      p = p.substring(1);
+    }
+
+    // Path already rooted at the site's uploads folder.
+    if (p.startsWith('uploads/')) {
+      return 'https://manage.bdtuition.com/$p';
+    }
+
+    // Bare filename or teachers-documents relative path.
+    return '$imageBaseUrl$p';
+  }
 }

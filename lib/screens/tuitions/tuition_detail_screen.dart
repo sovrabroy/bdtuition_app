@@ -127,19 +127,20 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
                     children: [
                       _row('Class', _pick(tuition, ['class', 'student_class'])),
                       _row('Subject',
-                          _pick(tuition, ['subject', 'subjects', 'subject_name'])),
+                          _pick(tuition, ['subject', 'subjects', 'subject_name', 'prefered_subjects', 'preferred_subjects'])),
                       _row('Medium', _pick(tuition, ['medium', 'version'])),
                       _row('Days Per Week', _pick(tuition,
                           ['day_per_week', 'days_per_week', 'day', 'days'])),
                       _row('Time', _pick(tuition, [
                         'time',
                         'preferred_time',
+                        'prefered_time',
                         'tuition_time',
                         'tution_time',
                         'class_time'
                       ])),
                       _row('Duration',
-                          _pick(tuition, ['duration', 'class_duration'])),
+                          _pick(tuition, ['duration', 'class_duration', 'prefered_duration', 'preferred_duration'])),
                       _row('Category',
                           _pick(tuition, ['category', 'tuition_category'])),
                       _row('Curriculum',
@@ -173,8 +174,19 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
                     children: [
                       _row('City', _pick(tuition, ['city', 'district'])),
                       _row('Area', _pick(tuition, ['area', 'location'])),
-                      _row('Address',
-                          _pick(tuition, ['address', 'full_address'])),
+                      _addressRow(
+                        'Address',
+                        _pick(tuition, [
+                          'address',
+                          'full_address',
+                          'tuition_address'
+                        ]),
+                        _pick(tuition, [
+                          'area',
+                          'location',
+                        ]),
+                        _pick(tuition, ['city', 'district']),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -191,7 +203,7 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
                           _pick(tuition,
                               ['number_of_students', 'no_of_students', 'students'])),
                       _row('Other Requirements',
-                          _pick(tuition, ['other_requirements', 'requirements'])),
+                          _pick(tuition, ['other_requirements', 'requirements', 'tutor_requirement', 'tutor_requirements'])),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -326,6 +338,91 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
   Widget _row(String label, String value) {
     if (value.trim().isEmpty) return const SizedBox.shrink();
     return _DetailRow(label, value);
+  }
+
+  /// A tappable address row that opens the location in Google Maps.
+  /// Uses the address itself plus area/city to build a precise search query.
+  Widget _addressRow(String label, String address, String area, String city) {
+    if (address.trim().isEmpty) return const SizedBox.shrink();
+
+    final query = [address, area, city]
+        .where((p) => p.trim().isNotEmpty)
+        .toSet()
+        .join(', ');
+
+    return InkWell(
+      onTap: () => _openMaps(query),
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(
+              width: 130,
+              child: Text(
+                'Address',
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    address,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Row(
+                    children: [
+                      Icon(Icons.map, size: 14, color: AppTheme.primaryColor),
+                      SizedBox(width: 4),
+                      Text(
+                        'Open in Google Maps',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.primaryColor,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Launches Google Maps with a search for the given location text.
+  Future<void> _openMaps(String query) async {
+    final encoded = Uri.encodeComponent(query);
+    final uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$encoded');
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open Google Maps')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open Google Maps')),
+        );
+      }
+    }
   }
 
   void _showApplyDialog(int tuitionId) {
@@ -593,22 +690,24 @@ class _AdditionalInfoCard extends StatelessWidget {
   static const Set<String> _handled = {
     'id',
     'class', 'student_class',
-    'subject', 'subjects', 'subject_name',
+    'subject', 'subjects', 'subject_name', 'prefered_subjects', 'preferred_subjects',
     'medium', 'version',
     'day_per_week', 'days_per_week', 'day', 'days',
-    'time', 'preferred_time', 'tuition_time', 'tution_time', 'class_time',
-    'duration', 'class_duration',
+    'time', 'preferred_time', 'prefered_time', 'tuition_time', 'tution_time', 'class_time',
+    'duration', 'class_duration', 'prefered_duration', 'preferred_duration',
     'category', 'tuition_category',
     'curriculum', 'syllabus',
     'salary', 'salary_amount', 'salary_range', 'salary_from_to',
     'media_fee', 'media_commission', 'media', 'commission', 'media_charge',
-    'city', 'district', 'area', 'location', 'address', 'full_address',
+    'city', 'district', 'area', 'location', 'address', 'full_address', 'tuition_address',
     'prefered_gender', 'preferred_gender', 'gender',
     'number_of_students', 'no_of_students', 'students',
-    'other_requirements', 'requirements',
+    'other_requirements', 'requirements', 'tutor_requirement', 'tutor_requirements',
     'contact', 'contact_number', 'phone', 'phone_number', 'mobile', 'whatsapp',
     'contact_instruction', 'apply_instruction', 'sms_instruction',
     'tuition_code', 'start_date',
+    // Guardian's private note about the student — must never be shown to teachers.
+    'student_short_details', 'student_details', 'short_details',
     // Flags used by the UI logic, not for display.
     'has_applied', 'can_apply', 'total_applicants', 'status',
     'created_at', 'updated_at', 'deleted_at',

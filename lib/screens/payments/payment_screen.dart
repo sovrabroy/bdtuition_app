@@ -81,10 +81,13 @@ class _PaymentScreenState extends State<PaymentScreen>
               }
 
               final data = provider.paymentsData;
-              final duePayments =
-                  List<dynamic>.from(data?['due_payments'] ?? []);
-              final paymentHistory =
-                  List<dynamic>.from(data?['payment_history'] ?? []);
+              final duePayments = _extractDuePayments(data);
+              final paymentHistory = List<dynamic>.from(
+                data?['payment_history'] ??
+                    data?['payments'] ??
+                    data?['history'] ??
+                    [],
+              );
 
               return TabBarView(
                 controller: _tabController,
@@ -111,8 +114,9 @@ class _PaymentScreenState extends State<PaymentScreen>
   }
 
   void _showPaymentDialog(Map<String, dynamic> assignment) {
+    final dueAmount = _dueAmountOf(assignment);
     final amountController = TextEditingController(
-      text: '${assignment['due_amount'] ?? ''}',
+      text: dueAmount > 0 ? dueAmount.toStringAsFixed(0) : '',
     );
     final transactionIdController = TextEditingController();
     String selectedMethod = 'bkash';
@@ -151,7 +155,7 @@ class _PaymentScreenState extends State<PaymentScreen>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Due: ৳${assignment['due_amount'] ?? '0'}',
+                            'Due: ৳${dueAmount.toStringAsFixed(0)}',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -333,6 +337,57 @@ class _PaymentScreenState extends State<PaymentScreen>
   }
 }
 
+/// Parse a due amount from any of the common backend field names.
+/// Returns 0 when nothing usable is present.
+double _dueAmountOf(Map<String, dynamic> m) {
+  const keys = [
+    'due_amount',
+    'due',
+    'due_payment',
+    'pending_due',
+    'pending_amount',
+    'remaining',
+    'remaining_amount',
+    'balance',
+  ];
+  for (final k in keys) {
+    final v = m[k];
+    if (v == null) continue;
+    final d = v is num ? v.toDouble() : double.tryParse('$v'.replaceAll(RegExp(r'[^0-9.]'), ''));
+    if (d != null && d > 0) return d;
+  }
+  return 0;
+}
+
+/// Build the list of due payments, resilient to different response shapes.
+/// 1) Use an explicit due list if the API sends one.
+/// 2) Otherwise derive it from assignments that carry a positive due amount.
+List<dynamic> _extractDuePayments(Map<String, dynamic>? data) {
+  if (data == null) return [];
+
+  final explicit = data['due_payments'] ?? data['dues'] ?? data['due'];
+  if (explicit is List && explicit.isNotEmpty) return List<dynamic>.from(explicit);
+
+  // Fall back: scan any assignment-like list for positive dues.
+  final candidates = [
+    data['assignments'],
+    data['active_assignments'],
+    data['tuitions'],
+    data['payments'],
+  ];
+  for (final c in candidates) {
+    if (c is List) {
+      final derived = c
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .where((e) => _dueAmountOf(e) > 0)
+          .toList();
+      if (derived.isNotEmpty) return derived;
+    }
+  }
+  return [];
+}
+
 class _DuePaymentsList extends StatelessWidget {
   final List<dynamic> payments;
   final Future<void> Function() onRefresh;
@@ -458,7 +513,7 @@ class _DuePaymentsList extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '৳${payment['due_amount'] ?? '0'}',
+                      '৳${_dueAmountOf(payment).toStringAsFixed(0)}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 22,

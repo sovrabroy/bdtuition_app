@@ -148,19 +148,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: Column(
                     children: [
-                      CircleAvatar(
-                        radius: 45,
-                        backgroundColor: Colors.white24,
-                        backgroundImage: profile['personal_photo'] != null
-                            ? NetworkImage(
-                                '${ApiConfig.imageBaseUrl}${profile['personal_photo']}',
-                              )
-                            : null,
-                        child: profile['personal_photo'] == null
-                            ? const Icon(Icons.person,
-                                size: 45, color: Colors.white)
-                            : null,
-                      ),
+                      Builder(builder: (context) {
+                        final photoUrl = ApiConfig.resolveImageUrl(
+                            profile['personal_photo'] ??
+                                profile['photo'] ??
+                                profile['image'] ??
+                                profile['avatar']);
+                        return CircleAvatar(
+                          radius: 45,
+                          backgroundColor: Colors.white24,
+                          backgroundImage: photoUrl != null
+                              ? NetworkImage(photoUrl)
+                              : null,
+                          child: photoUrl == null
+                              ? const Icon(Icons.person,
+                                  size: 45, color: Colors.white)
+                              : null,
+                        );
+                      }),
                       const SizedBox(height: 12),
                       Text(
                         profile['teacher_name'] ?? 'N/A',

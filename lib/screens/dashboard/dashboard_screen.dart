@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
+import '../../config/api_config.dart';
 import '../../providers/teacher_provider.dart';
+import '../tuitions/tuition_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -59,13 +61,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundImage: data['personal_photo'] != null
-                            ? NetworkImage(data['personal_photo'])
-                            : null,
-                        child: data['personal_photo'] == null ? const Icon(Icons.person, size: 30) : null,
-                      ),
+                      Builder(builder: (context) {
+                        final photoUrl = ApiConfig.resolveImageUrl(
+                            data['personal_photo'] ??
+                                data['photo'] ??
+                                data['image'] ??
+                                data['avatar']);
+                        return CircleAvatar(
+                          radius: 30,
+                          backgroundImage:
+                              photoUrl != null ? NetworkImage(photoUrl) : null,
+                          child: photoUrl == null
+                              ? const Icon(Icons.person, size: 30)
+                              : null,
+                        );
+                      }),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
@@ -144,9 +154,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 if (data['recent_applications'] != null && (data['recent_applications'] as List).isNotEmpty)
                   ...List.generate((data['recent_applications'] as List).length, (i) {
                     final app = data['recent_applications'][i];
+                    final tuitionId = app['tuition_id'] ??
+                        app['id'] ??
+                        app['tuition']?['id'];
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
+                        onTap: tuitionId != null
+                            ? () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => TuitionDetailScreen(
+                                      tuitionId: tuitionId is int
+                                          ? tuitionId
+                                          : int.tryParse('$tuitionId') ?? 0,
+                                    ),
+                                  ),
+                                );
+                              }
+                            : null,
                         leading: CircleAvatar(
                           backgroundColor: app['status'] == 'Pending' ? AppTheme.warningColor : AppTheme.successColor,
                           child: Icon(

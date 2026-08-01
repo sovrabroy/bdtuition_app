@@ -89,18 +89,39 @@ class ApiService {
     });
   }
 
-  Future<Response> forgotPassword(String phoneNumber) async {
-    return await _dio.post(ApiConfig.forgotPassword, data: {
-      'phone_number': phoneNumber,
-    });
+  /// Requests a password-reset code. Pass the identifier the teacher chose to
+  /// use — either their phone number or their email. The backend accepts
+  /// whichever key is present and sends the code over that channel.
+  Future<Response> forgotPassword({String? phoneNumber, String? email}) async {
+    final data = <String, dynamic>{};
+    if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+      data['phone_number'] = phoneNumber.trim();
+    }
+    if (email != null && email.trim().isNotEmpty) {
+      data['email'] = email.trim();
+    }
+    return await _dio.post(ApiConfig.forgotPassword, data: data);
   }
 
-  Future<Response> resetPassword(String phone, String code, String newPassword) async {
-    return await _dio.post(ApiConfig.resetPassword, data: {
-      'phone_number': phone,
+  /// Confirms the reset. Send back the same identifier used to request the code
+  /// (phone OR email) plus the verification code and the new password.
+  Future<Response> resetPassword({
+    String? phoneNumber,
+    String? email,
+    required String code,
+    required String newPassword,
+  }) async {
+    final data = <String, dynamic>{
       'verify_code': code,
       'new_password': newPassword,
-    });
+    };
+    if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+      data['phone_number'] = phoneNumber.trim();
+    }
+    if (email != null && email.trim().isNotEmpty) {
+      data['email'] = email.trim();
+    }
+    return await _dio.post(ApiConfig.resetPassword, data: data);
   }
 
   Future<Response> logout() async {

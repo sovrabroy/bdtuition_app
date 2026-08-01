@@ -127,13 +127,16 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> forgotPassword(String phone) async {
+  Future<bool> forgotPassword({String? phone, String? email}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _api.forgotPassword(phone);
+      final response = await _api.forgotPassword(
+        phoneNumber: phone,
+        email: email,
+      );
       _isLoading = false;
       notifyListeners();
       return response.data['success'] == true;
@@ -145,13 +148,23 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> resetPassword(String phone, String code, String newPassword) async {
+  Future<bool> resetPassword({
+    String? phone,
+    String? email,
+    required String code,
+    required String newPassword,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _api.resetPassword(phone, code, newPassword);
+      final response = await _api.resetPassword(
+        phoneNumber: phone,
+        email: email,
+        code: code,
+        newPassword: newPassword,
+      );
       _isLoading = false;
       notifyListeners();
       return response.data['success'] == true;

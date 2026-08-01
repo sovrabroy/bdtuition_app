@@ -28,6 +28,26 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
   }
 
   Future<void> _logout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('Do you want to exit and log out of your account?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (shouldLogout != true) return;
+    if (!mounted) return;
+
     final guardian = Provider.of<GuardianProvider>(context, listen: false);
     await guardian.logout();
     if (!mounted) return;

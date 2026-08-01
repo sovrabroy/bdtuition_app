@@ -39,10 +39,9 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
   List<Map<String, dynamic>> _approved = [];
   String? _selectedCode;
 
-  // Teacher's live GPS (origin) for the distance-to-guardian check.
+  // Teacher's live GPS — pinned by the teacher (not guardian).
   double? _teacherLat;
   double? _teacherLng;
-  double? _distanceMeters;
 
   @override
   void initState() {
@@ -151,7 +150,6 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
         _guardianLng = lng;
       }
     });
-    _recomputeDistance();
   }
 
   /// Manual lookup (typed code) — kept as a fallback for codes not in the
@@ -239,41 +237,10 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
     });
   }
 
+  /// Pins the TEACHER's own live GPS. The guardian's address comes from the
+  /// selected tuition code — the teacher only needs to mark where THEY are so
+  /// "Open in Maps" can draw the route (and Maps shows the real road distance).
   Future<void> _pinCurrentLocation() async {
-    setState(() => _pinning = true);
-    try {
-      final pos = await SecurityService.getCurrentPosition();
-      if (!mounted) return;
-      setState(() {
-        _guardianLat = pos.latitude;
-        _guardianLng = pos.longitude;
-      });
-      _recomputeDistance();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Guardian location pinned.')),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _pinning = false);
-    }
-  }
-
-  /// Reads the teacher's live GPS and computes the straight-line distance to
-  /// the guardian's location (when both are known).
-  Future<void> _checkDistance() async {
-    if (_guardianLat == null || _guardianLng == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Pin the guardian location first, or select an '
-                'approved code that includes it.')),
-      );
-      return;
-    }
     setState(() => _pinning = true);
     try {
       final pos = await SecurityService.getCurrentPosition();
@@ -282,7 +249,9 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
         _teacherLat = pos.latitude;
         _teacherLng = pos.longitude;
       });
-      _recomputeDistance();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your location pinned.')),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -293,27 +262,9 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
       if (mounted) setState(() => _pinning = false);
     }
   }
-
-  void _recomputeDistance() {
-    if (_teacherLat != null &&
-        _teacherLng != null &&
-        _guardianLat != null &&
-        _guardianLng != null) {
-      _distanceMeters = SecurityService.distanceBetween(
-        _teacherLat!,
-        _teacherLng!,
-        _guardianLat!,
-        _guardianLng!,
-      );
-    } else {
-      _distanceMeters = null;
-    }
-    if (mounted) setState(() {});
-  }
-
-  /// Opens Google Maps directions from the teacher's live GPS (origin) to the
-  /// guardian's location — pinned coordinates if we have them, else the typed
-  /// address. Lets the teacher see the real route & travel distance.
+  /// Opens Google Maps directions from the teacher's pinned location (origin)
+  /// to the guardian's location — pinned coordinates if we have them, else the
+  /// typed address. Lets the teacher see the real route & travel distance.
   Future<void> _openDirections() async {
     // Destination: prefer exact coordinates, fall back to the address text.
     final String destination;
@@ -354,11 +305,6 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
         );
       }
     }
-  }
-
-  String _formatDistance(double meters) {
-    if (meters < 1000) return '${meters.toStringAsFixed(0)} m';
-    return '${(meters / 1000).toStringAsFixed(2)} km';
   }
 
   Future<void> _save() async {
@@ -502,15 +448,16 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
                     children: [
                       const Icon(Icons.my_location, size: 20),
                       const SizedBox(width: 8),
-                      const Text('Guardian Location',
+                      const Text('Your Location',
                           style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _guardianLat != null
-                        ? 'Pinned: ${_guardianLat!.toStringAsFixed(5)}, ${_guardianLng!.toStringAsFixed(5)}'
-                        : 'Optional — enables distance check & navigation.',
+                    _teacherLat != null
+                        ? 'Pinned: ${_teacherLat!.toStringAsFixed(5)}, ${_teacherLng!.toStringAsFixed(5)}'
+                        : 'Pin where you are now so the route to the guardian '
+                            'starts from your exact spot.',
                     style: const TextStyle(
                         color: Colors.black54, fontSize: 13),
                   ),
@@ -525,7 +472,7 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
                                 CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.gps_fixed, size: 18),
-                    label: Text(_guardianLat != null
+                    label: Text(_teacherLat != null
                         ? 'Re-pin at current location'
                         : 'Pin at current location'),
                   ),
@@ -534,7 +481,7 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
             ),
             const SizedBox(height: 14),
 
-            // ---- Distance: teacher → guardian ----
+            // ---- Route & distance via Google Maps ----
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -548,38 +495,24 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
                     children: [
                       Icon(Icons.directions, size: 20),
                       SizedBox(width: 8),
-                      Text('Distance to Guardian',
+                      Text('Route to Guardian',
                           style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    _distanceMeters != null
-                        ? 'About ${_formatDistance(_distanceMeters!)} from your current location (straight line).'
-                        : 'Tap below to measure the distance from where you are '
-                            'now to the guardian address.',
-                    style: const TextStyle(
-                        color: Colors.black54, fontSize: 13),
+                  const Text(
+                    'Opens Google Maps with the full route and real travel '
+                    'distance from your pinned location to the guardian address.',
+                    style: TextStyle(color: Colors.black54, fontSize: 13),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _pinning ? null : _checkDistance,
-                          icon: const Icon(Icons.straighten, size: 18),
-                          label: const Text('Check distance'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _openDirections,
-                          icon: const Icon(Icons.map, size: 18),
-                          label: const Text('Open in Maps'),
-                        ),
-                      ),
-                    ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _openDirections,
+                      icon: const Icon(Icons.map, size: 18),
+                      label: const Text('Open in Google Maps'),
+                    ),
                   ),
                 ],
               ),

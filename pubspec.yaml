@@ -53,7 +53,21 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
 
+  # Generates Android launcher icons from assets/logo.png (replaces the
+  # default Flutter logo). Run: flutter pub run flutter_launcher_icons
+  flutter_launcher_icons: ^0.13.1
+
 flutter:
   uses-material-design: true
   assets:
     - assets/
+
+# App launcher icon configuration. Uses the BDTuition logo for the Android
+# home-screen icon across all densities, with a white background for the
+# adaptive (round) icon so the logo stays visible on any launcher.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/logo.png"

@@ -8,6 +8,42 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:dio/dio.dart';
 
+// ---- Teaching-preference option lists (used in registration & profile) ----
+const List<String> kExpectedMediums = [
+  'Bangla medium',
+  'English Version /NC',
+  'British Curriculum',
+  'American Curriculum',
+  'IB Curriculum',
+  'Madrasa Curriculum',
+];
+
+const List<String> kExpectedSalaryRanges = [
+  '2000-3000',
+  '4000-5000',
+  '6000-8000',
+  '8000-10000',
+  '12000-15000',
+  '20000+',
+];
+
+const List<String> kExpectedClasses = [
+  'Play', 'Nursery', 'KG',
+  'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
+  'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10',
+  'SSC', 'HSC', 'O Level', 'A Level',
+  'Admission', 'Honours/University',
+];
+
+// Grouped so the teacher can pick subjects under the right category.
+const Map<String, List<String>> kExpectedSubjectGroups = {
+  'Common': ['General Math', 'English', 'Bangla', 'ICT'],
+  'Science': ['Higher Math', 'Physics', 'Chemistry', 'Biology', 'Statistics'],
+  'Commerce': ['Accounting', 'Finance', 'Marketing', 'Management', 'Economics'],
+  'Arts': ['Geography', 'Logic', 'Psychology', 'Sociology', 'History', 'Islamic History', 'Civics'],
+  'Special': ['Quran', 'Spoken English', 'IELTS', 'Drawing & Hand Writing', 'Dance', 'Music', 'Guitar'],
+};
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -41,10 +77,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _addressCtrl = TextEditingController();
   final _sscGpaCtrl = TextEditingController();
   final _hscGpaCtrl = TextEditingController();
-  // Teaching preference (asked at registration).
-  final _expectedClassCtrl = TextEditingController();
-  final _expectedSubjectCtrl = TextEditingController();
-  final _expectedSalaryCtrl = TextEditingController();
 
   String _gender = 'Male';
   String _medium = 'Bangla medium';
@@ -54,9 +86,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _city = 'Dhaka';
   String? _area;
   List<String> _expectedAreas = [];
-  // Teaching preference dropdown state.
-  String _expectedMedium = 'Bangla medium';
+  // Teaching preference (asked at registration, also editable in profile).
+  String _expectedMedium = kExpectedMediums.first;
   String _dayPerWeek = '3';
+  String _expectedSalary = kExpectedSalaryRanges.first;
+  final List<String> _expectedClasses = [];
+  final List<String> _expectedSubjects = [];
 
   // Image files
   File? _universityIdPhoto;
@@ -66,7 +101,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   File? _selfie;
 
   Future<void> _pickImage(String field) async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 80);
+    // Selfie must be a live front-camera capture (no gallery upload);
+    // everything else is a normal gallery pick.
+    final bool isSelfie = field == 'selfie';
+    final picked = await _picker.pickImage(
+      source: isSelfie ? ImageSource.camera : ImageSource.gallery,
+      preferredCameraDevice: isSelfie ? CameraDevice.front : CameraDevice.rear,
+      maxWidth: 1200,
+      imageQuality: 80,
+    );
     if (picked != null) {
       setState(() {
         switch (field) {
@@ -110,14 +153,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       'area': _area ?? '',
       'expected_area': _expectedAreas,
       // Teaching preference collected at registration.
-      'expected_class': _expectedClassCtrl.text.trim(),
-      'expected_subject': _expectedSubjectCtrl.text.trim(),
+      'expected_class': _expectedClasses.join(', '),
+      'expected_subject': _expectedSubjects.join(', '),
       'expected_medium': _expectedMedium,
       'day_per_week': _dayPerWeek,
-      'expected_salary': _expectedSalaryCtrl.text.trim(),
+      'expected_salary': _expectedSalary,
       'living_address': _addressCtrl.text.trim(),
       'father_name': _fatherNameCtrl.text.trim(),
+      'father_brother_phone': _fatherPhoneCtrl.text.trim(),
       'mother_name': _motherNameCtrl.text.trim(),
+      'mother_sister_phone': _motherPhoneCtrl.text.trim(),
       'local_guardian_phone': _localGuardianCtrl.text.trim(),
       'departmental_friend_phone': _deptFriendCtrl.text.trim(),
       'university_id_photo': await MultipartFile.fromFile(_universityIdPhoto!.path),
@@ -154,7 +199,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
+  void _toggleFromList(List<String> list, String value) {
+    setState(() {
+      if (list.contains(value)) {
+        list.remove(value);
+      } else {
+        list.add(value);
+      }
+    });
+  }
+
   Widget _buildImagePicker(String label, File? file, String field) {
+    final bool isSelfie = field == 'selfie';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -175,12 +231,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     borderRadius: BorderRadius.circular(10),
                     child: Image.file(file, fit: BoxFit.cover),
                   )
-                : const Column(
+                : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.camera_alt, size: 36, color: Colors.grey),
-                      SizedBox(height: 4),
-                      Text('Tap to upload', style: TextStyle(color: Colors.grey)),
+                      Icon(isSelfie ? Icons.camera_front : Icons.camera_alt,
+                          size: 36, color: Colors.grey),
+                      const SizedBox(height: 4),
+                      Text(isSelfie ? 'Tap to open front camera' : 'Tap to upload',
+                          style: const TextStyle(color: Colors.grey)),
                     ],
                   ),
           ),
@@ -324,20 +382,65 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: _expectedClassCtrl,
-                  decoration: const InputDecoration(labelText: 'Expected Class * (e.g. Class 6-10, HSC)'),
+                // Expected Class — multiple select.
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Expected Class * (select one or more)',
+                      style: TextStyle(fontWeight: FontWeight.w500)),
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _expectedSubjectCtrl,
-                  decoration: const InputDecoration(labelText: 'Expected Subject * (e.g. Math, Physics)'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: kExpectedClasses.map((c) {
+                    return FilterChip(
+                      label: Text(c),
+                      selected: _expectedClasses.contains(c),
+                      onSelected: (_) => _toggleFromList(_expectedClasses, c),
+                    );
+                  }).toList(),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                // Expected Subject — multiple select, grouped by category.
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Expected Subject * (select one or more)',
+                      style: TextStyle(fontWeight: FontWeight.w500)),
+                ),
+                const SizedBox(height: 8),
+                ...kExpectedSubjectGroups.entries.map((group) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, bottom: 4),
+                        child: Text('${group.key} subject',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[700])),
+                      ),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: group.value.map((s) {
+                          return FilterChip(
+                            label: Text(s),
+                            selected: _expectedSubjects.contains(s),
+                            onSelected: (_) => _toggleFromList(_expectedSubjects, s),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  );
+                }),
+                const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _expectedMedium,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Expected Medium *'),
-                  items: ['Bangla medium', 'English version', 'English medium', 'Madrasa']
+                  items: kExpectedMediums
                       .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                       .toList(),
                   onChanged: (v) => setState(() => _expectedMedium = v!),
@@ -352,10 +455,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onChanged: (v) => setState(() => _dayPerWeek = v!),
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: _expectedSalaryCtrl,
-                  keyboardType: TextInputType.number,
+                DropdownButtonFormField<String>(
+                  value: _expectedSalary,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Expected Salary * (৳ per month)'),
+                  items: kExpectedSalaryRanges
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _expectedSalary = v!),
                 ),
               ],
             ),
@@ -416,7 +523,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 12),
                 TextFormField(controller: _fatherNameCtrl, decoration: const InputDecoration(labelText: 'Father Name *')),
                 const SizedBox(height: 12),
+                TextFormField(controller: _fatherPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Father Phone *')),
+                const SizedBox(height: 12),
                 TextFormField(controller: _motherNameCtrl, decoration: const InputDecoration(labelText: 'Mother Name *')),
+                const SizedBox(height: 12),
+                TextFormField(controller: _motherPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Mother Phone *')),
                 const SizedBox(height: 12),
                 TextFormField(controller: _localGuardianCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Local Guardian Phone *')),
                 const SizedBox(height: 12),
@@ -458,7 +569,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _deptFriendCtrl.dispose(); _universityCtrl.dispose(); _departmentCtrl.dispose();
     _schoolCtrl.dispose(); _collegeCtrl.dispose();
     _addressCtrl.dispose(); _sscGpaCtrl.dispose(); _hscGpaCtrl.dispose();
-    _expectedClassCtrl.dispose(); _expectedSubjectCtrl.dispose(); _expectedSalaryCtrl.dispose();
     super.dispose();
   }
 }

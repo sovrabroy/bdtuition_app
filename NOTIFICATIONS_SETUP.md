@@ -1,103 +1,127 @@
-# Push Notifications — Setup Checklist
+# Push Notifications — cPanel Setup (সহজ বাংলা গাইড)
 
-The teacher app now has **two halves** of the "nearby tuition" notification feature.
+অ্যাপের দিকের সব কাজ **শেষ** (Firebase কোড, google-services.json, token পাঠানো — সব বসানো হয়ে গেছে)।
+এখন শুধু **cPanel-এ ৩টা কাজ** বাকি। নিচে একদম ধাপে ধাপে দেওয়া হলো।
 
-## ✅ Already working (shipped in this update — no setup needed)
-
-**In-app popup while the app is open.** When a new tuition is posted in one of the
-teacher's selected *expected areas*, a nice popup appears with the code, area,
-and salary, plus a **View** button that opens the tuition. This is real: it polls
-the live tuitions API every ~3 minutes and never shows fake alerts. It works with
-your current backend unchanged.
-
-Files added/wired for this:
-- `lib/services/nearby_tuition_notifier.dart` (new — the watcher)
-- `lib/screens/dashboard/home_screen.dart` (wired the popup in)
-
-Nothing else is required for this part. Once the APK rebuilds from GitHub Actions,
-it just works.
+> ⚠️ **খুব জরুরি:** গত রাতে যে পুরনো পদ্ধতি (`fcm.googleapis.com/fcm/send` আর `Authorization: key=...`)
+> লেখা ছিল, সেটা Google **২০২৪ সালের জুনে বন্ধ করে দিয়েছে** — আর কাজ করে না।
+> তাই আমরা এখন **নতুন v1 পদ্ধতি** ব্যবহার করছি। এর জন্য "server key"-এর বদলে
+> Firebase থেকে একটা **Service Account JSON ফাইল** লাগবে (নিচে কীভাবে নিতে হয় দেখানো আছে)।
 
 ---
 
-## ⏳ Needs your setup — system notification when the app is CLOSED / offline
+## অ্যাপে যা যা আগে থেকেই করা আছে (তোমার কিছু করতে হবে না)
+- `google-services.json` → `android/app/`-এ আছে (Firebase project `bdtuition-1fad3`)।
+- Gradle-এ plugin, desugaring, `minSdk 23` বসানো।
+- Package: `firebase_core`, `firebase_messaging`, `flutter_local_notifications`।
+- `lib/services/push_service.dart` → FCM চালু করে, "Tuition Alerts" (channel id: `tuition_alerts`)
+  channel বানায়, login-এর পর device token backend-এ `POST /api/fcm-token`-এ পাঠায়।
+- `AndroidManifest.xml` → Android 13+ এর জন্য `POST_NOTIFICATIONS` permission।
+- `main.dart` → Firebase init + background handler।
 
-A notification that appears in the phone's top notification tray **while the app
-isn't running** cannot be done from the app alone. Android only delivers those
-through **Firebase Cloud Messaging (FCM)**, and your server has to send the push.
+> **লাইভ DB (`mohaqtzn_wp37`)-এ যা confirmed:**
+> - `teachers` টেবিল → `expected_area`, এবং `fcm_token` (নিচে যোগ করব)
+> - `tuitions` টেবিল → `area`, `tuition_code`, `salary`
 
-### ✅ Done on the app side (shipped in this update)
-- `google-services.json` is in `android/app/` (Firebase project `bdtuition-1fad3`).
-- Gradle wired: `com.google.gms.google-services` plugin, core-library desugaring,
-  `minSdk` raised to 23, desugar dependency.
-- Packages added: `firebase_core`, `firebase_messaging`, `flutter_local_notifications`.
-- `lib/services/push_service.dart` — initialises FCM, creates the "Tuition Alerts"
-  notification channel, shows foreground alerts, and sends the device token to the
-  backend `POST /fcm-token` after login (and on token refresh).
-- `AndroidManifest.xml` — `POST_NOTIFICATIONS` permission for Android 13+.
-- `main.dart` — Firebase init + background handler, all guarded so a misconfig
-  can never stop the app from launching.
+---
 
-Once the APK rebuilds from GitHub Actions, each logged-in device registers its
-token automatically. **All that's left is the two cPanel backend pieces below.**
+# ধাপ ১ — teachers টেবিলে fcm_token কলাম যোগ করা + route
 
-> **Confirmed against the live DB (`mohaqtzn_wp37`):**
-> - `teachers` table → `expected_area` (teacher's desired area), plus `fcm_token` (added below)
-> - `tuitions` table → `area`, `tuition_code`, `salary`
-> The code below already uses these exact names — no adjustment needed.
-
-### Step 1 — Backend: store each teacher's device token (cPanel)
-Add the `fcm_token` column to the `teachers` table:
+## ১ক) phpMyAdmin-এ SQL চালাও
+cPanel → **phpMyAdmin** → বাঁ পাশ থেকে `mohaqtzn_wp37` database → উপরে **SQL** ট্যাব →
+এই লাইনটা পেস্ট করে **Go** চাপো:
 
 ```sql
 ALTER TABLE teachers ADD COLUMN fcm_token VARCHAR(255) NULL;
 ```
 
-Add the endpoint the app already calls (`POST /api/fcm-token`) to save it:
+এতে প্রতিটা টিচারের ফোনের token জমা রাখার জায়গা তৈরি হলো।
+
+## ১খ) route যোগ করো (panel.bdtuition.com)
+`routes/api.php` ফাইলে (cPanel → File Manager → panel.bdtuition.com এর ফোল্ডার → `routes/api.php`)
+এই route যোগ করো — অ্যাপ এই ঠিকানাতেই token পাঠায়:
 
 ```php
-// routes/api.php  (panel.bdtuition.com)
 Route::middleware('auth:sanctum')->post('/fcm-token', function (\Illuminate\Http\Request $request) {
     $request->user()->update(['fcm_token' => $request->input('token')]);
     return response()->json(['success' => true]);
 });
 ```
 
-### Step 2 — Backend: send a push when a matching tuition is posted (cPanel)
-Where a new tuition is saved (the tuition store controller), add this right
-after the tuition is created. It finds teachers whose `expected_area` contains
-the tuition's `area` and pushes to their `fcm_token`:
+---
 
-```php
-$area = $tuition->area;
+# ধাপ ২ — Firebase থেকে Service Account JSON নেওয়া
 
-$teachers = \DB::table('teachers')
-    ->whereNotNull('fcm_token')
-    ->where('expected_area', 'like', "%{$area}%")
-    ->get();
+1. https://console.firebase.google.com → তোমার project **bdtuition-1fad3** খোলো।
+2. উপরে গিয়ার আইকন ⚙️ → **Project settings**।
+3. **Service accounts** ট্যাব → **Generate new private key** বাটন → **Generate key**।
+4. একটা `.json` ফাইল ডাউনলোড হবে (নাম যেমন `bdtuition-1fad3-xxxx.json`)।
 
-foreach ($teachers as $teacher) {
-    \Illuminate\Support\Facades\Http::withHeaders([
-        'Authorization' => 'key=' . env('FCM_SERVER_KEY'),
-        'Content-Type'  => 'application/json',
-    ])->post('https://fcm.googleapis.com/fcm/send', [
-        'to' => $teacher->fcm_token,
-        'notification' => [
-            'title' => 'নতুন টিউশন আপনার এলাকায়!',
-            'body'  => "{$tuition->tuition_code} — {$tuition->area}, ৳{$tuition->salary}/মাস",
-        ],
-        'data' => [
-            'tuition_id'   => (string) $tuition->id,
-            'tuition_code' => (string) $tuition->tuition_code,
-            'area'         => (string) $tuition->area,
-        ],
-    ]);
-}
+### এই ফাইলটা cPanel-এ আপলোড করো — কিন্তু নিরাপদ জায়গায়
+এটা যেন কেউ ব্রাউজার দিয়ে ডাউনলোড করতে না পারে, তাই **public_html-এর বাইরে** রাখো।
+cPanel → File Manager → `/home/mohaqtzn/` এ একটা নতুন ফোল্ডার বানাও `firebase`, তার ভিতরে
+ফাইলটা আপলোড করো। মানে পুরো path হবে যেমন:
+
+```
+/home/mohaqtzn/firebase/bdtuition-service-account.json
 ```
 
-Get `FCM_SERVER_KEY` from Firebase Console → **Project settings** → **Cloud
-Messaging** → server key, and add `FCM_SERVER_KEY=...` to the cPanel `.env`.
+> নাম যা খুশি রাখতে পারো, শুধু নিচের `.env`-এ ঠিক ওই path-টাই বসাও।
 
-### Step 3 — Rebuild & test
-After your backend deploy, the APK from GitHub Actions already has the app side.
-Install it, log in (token registers automatically), then post a test tuition in
-an expected area to confirm the tray notification arrives with the app fully closed.
+### .env-এ path যোগ করো
+cPanel → File Manager → panel.bdtuition.com এর মূল ফোল্ডারে `.env` ফাইল খোলো, নিচে যোগ করো:
+
+```
+FCM_SERVICE_ACCOUNT=/home/mohaqtzn/firebase/bdtuition-service-account.json
+```
+
+সেভ করার পর একবার cache পরিষ্কার করলে ভালো (Terminal থাকলে):
+`php artisan config:clear`
+
+---
+
+# ধাপ ৩ — নতুন টিউশন হলে notification পাঠানো
+
+আমি তোমার জন্য দুইটা রেডি ফাইল বানিয়ে দিয়েছি (প্রজেক্টের `guardian_backend/` ফোল্ডারে):
+
+- **`FcmV1.php`** — এটাই আসল কাজটা করে (নতুন v1 পদ্ধতিতে notification পাঠায়)। কিছু বুঝতে হবে না।
+- **`send_tuition_push.php`** — এখান থেকে কোডের অংশটা তোমার controller-এ বসাতে হবে।
+
+## যা করবে:
+1. `FcmV1.php` ফাইলটা cPanel-এ আপলোড করো — যে ফোল্ডারে তোমার tuition controller/route আছে,
+   বা `app/Services/` এর মতো সুবিধাজনক জায়গায়। (path মনে রাখো।)
+2. যেখানে **নতুন টিউশন সেভ হয়** (tuition store controller, `$tuition` তৈরি হওয়ার ঠিক পরে),
+   সেখানে `send_tuition_push.php`-এর `---- paste from here ----` থেকে `---- paste up to here ----`
+   পর্যন্ত অংশটা বসাও। উপরে `require_once` লাইনে `FcmV1.php`-এর সঠিক path দাও।
+
+এই কোড নিজে থেকে:
+- ওই এলাকার (`expected_area` মিলে যাওয়া) সব টিচার খুঁজে বের করে,
+- যাদের `fcm_token` আছে, তাদের ফোনে notification পাঠায় —
+  **টাইটেল:** নতুন টিউশন আপনার এলাকায়! · **বডি:** `CODE — এলাকা, ৳বেতন/মাস`
+- কোনো একটা token নষ্ট হলেও টিউশন তৈরি আটকাবে না (সব guard করা আছে)।
+
+---
+
+# ধাপ ৪ — টেস্ট
+
+1. backend-এ উপরের সব বসানোর পর, GitHub Actions থেকে আসা নতুন APK ফোনে install করো।
+2. অ্যাপে **login** করো — এতে ওই ফোনের token আপনাআপনি `teachers.fcm_token`-এ জমা হবে
+   (phpMyAdmin-এ teachers টেবিল খুলে দেখতে পারো token বসেছে কিনা)।
+3. অ্যাপটা **পুরো বন্ধ** করে দাও।
+4. admin panel থেকে ওই টিচারের `expected_area`-এর সাথে মিলে এমন এলাকায় একটা **টেস্ট টিউশন**
+   পোস্ট করো।
+5. ফোনের উপরের notification bar-এ notification আসা উচিত — অ্যাপ বন্ধ থাকলেও।
+
+কোথাও আটকে গেলে বা error দেখলে আমাকে error লেখাটা পাঠাও — আমি ঠিক করে দেব।
+
+---
+
+## এক নজরে চেকলিস্ট
+- [ ] phpMyAdmin-এ `ALTER TABLE teachers ADD COLUMN fcm_token ...` চালানো
+- [ ] `routes/api.php`-এ `/fcm-token` route যোগ
+- [ ] Firebase থেকে Service Account JSON ডাউনলোড
+- [ ] JSON ফাইল public_html-এর বাইরে আপলোড
+- [ ] `.env`-এ `FCM_SERVICE_ACCOUNT=...` যোগ
+- [ ] `FcmV1.php` আপলোড
+- [ ] tuition controller-এ `send_tuition_push.php`-এর অংশ পেস্ট
+- [ ] নতুন APK install → login → অ্যাপ বন্ধ করে টেস্ট

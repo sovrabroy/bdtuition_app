@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
@@ -254,25 +255,76 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
                   if (tuition['has_applied'] == true)
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: AppTheme.warningColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Column(
                         children: [
-                          Icon(Icons.check_circle,
-                              color: AppTheme.warningColor, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Already Applied',
-                            style: TextStyle(
-                              color: AppTheme.warningColor,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle,
+                                  color: AppTheme.warningColor, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Already Applied',
+                                style: TextStyle(
+                                  color: AppTheme.warningColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
                           ),
+                          // After applying, let the teacher copy this tuition
+                          // code so they can paste/select it when adding a demo.
+                          if (_pick(tuition, ['tuition_code']).isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            InkWell(
+                              onTap: () =>
+                                  _copyCode(_pick(tuition, ['tuition_code'])),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color:
+                                          AppTheme.warningColor.withOpacity(0.4)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _pick(tuition, ['tuition_code']),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.copy,
+                                        size: 18,
+                                        color: AppTheme.primaryColor),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Tap the code to copy — use it when adding a demo class',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     )
@@ -438,6 +490,17 @@ class _TuitionDetailScreenState extends State<TuitionDetailScreen> {
         );
       }
     }
+  }
+
+  /// Copies the tuition code to the clipboard so the teacher can reuse it
+  /// when creating a demo class.
+  Future<void> _copyCode(String code) async {
+    if (code.trim().isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: code.trim()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Copied "$code" to clipboard')),
+    );
   }
 
   void _showApplyDialog(int tuitionId) {

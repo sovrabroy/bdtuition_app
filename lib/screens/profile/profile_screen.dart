@@ -4,6 +4,12 @@ import '../../config/theme.dart';
 import '../../config/api_config.dart';
 import '../../config/bd_locations.dart';
 import '../../providers/teacher_provider.dart';
+import '../auth/register_screen.dart'
+    show
+        kExpectedMediums,
+        kExpectedSalaryRanges,
+        kExpectedClasses,
+        kExpectedSubjectGroups;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,74 +22,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isEditing = false;
   bool _isSaving = false;
 
-  // Hardcoded option lists for the Tuition Preferences dropdowns.
-  static const List<String> kClassOptions = [
-    'Zero to Class 2',
-    'Class 3 to Class 5',
-    'Class 6 to Class 8',
-    'SSC / O Level (Class 9 & 10)',
-    'HSC / A Level (Class 11 & 12)',
-    'University Admission Test',
-    'Honours Level Student',
-  ];
-
-  static const Map<String, List<String>> kSubjectGroups = {
-    'Common': ['General Math', 'English', 'Bangla', 'ICT'],
-    'Science': ['Higher Math', 'Physics', 'Chemistry', 'Biology', 'Statistics'],
-    'Commerce': [
-      'Accounting',
-      'Finance',
-      'Marketing',
-      'Management',
-      'Economics',
-      'Statistics',
-    ],
-    'Arts': [
-      'Economics',
-      'Geography',
-      'Logic',
-      'Psychology',
-      'Sociology',
-      'History',
-      'Islamic History',
-    ],
-    'Special': [
-      'Quran',
-      'Spoken English',
-      'IELTS',
-      'Drawing & Hand Writing',
-      'Dance',
-      'Music',
-      'Guitar',
-    ],
-  };
-
-  static const List<String> kMediumOptions = [
-    'Bangla Medium',
-    'English Version / NC',
-    'British Curriculum',
-    'American Curriculum',
-    'IB Curriculum',
-    'Madrasa Curriculum',
-  ];
+  // Tuition-preference options are shared with the registration screen so a
+  // value saved at registration reloads cleanly here (and vice-versa).
+  static const List<String> kClassOptions = kExpectedClasses;
+  static const Map<String, List<String>> kSubjectGroups = kExpectedSubjectGroups;
+  static const List<String> kMediumOptions = kExpectedMediums;
+  static const List<String> kSalaryOptions = kExpectedSalaryRanges;
 
   static const List<String> kDaysOptions = [
-    '1 day',
-    '2 days',
-    '3 days',
-    '4 days',
-    '5 days',
-    '6 days',
-    '7 days',
-  ];
-
-  static const List<String> kSalaryOptions = [
-    '2000 - 3000',
-    '4000 - 5000',
-    '6000 - 8000',
-    '8000 - 10000',
-    '12000 - 15000',
-    '20000',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
   ];
 
   // Academic year options (same set used on the registration screen).
@@ -97,7 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   ];
 
   // Selected values for the Tuition Preferences dropdowns.
-  String? _expectedClass;
+  final List<String> _expectedClasses = [];
   final List<String> _expectedSubjects = [];
   String? _expectedMedium;
   String? _maxDaysPerWeek;
@@ -131,12 +84,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _populateControllers(Map<String, dynamic> profile) {
     // Seed dropdowns from saved values. Only accept a value that is one of the
     // known options (so old free-text data doesn't break the dropdown).
-    _expectedClass = _matchOption(profile['expected_class'], kClassOptions);
     _expectedMedium = _matchOption(profile['expected_medium'], kMediumOptions);
     _maxDaysPerWeek = _matchOption(
         profile['day_per_week']?.toString(), kDaysOptions);
     _minSalary =
         _matchOption(profile['expected_salary']?.toString(), kSalaryOptions);
+
+    _expectedClasses
+      ..clear()
+      ..addAll(
+        (profile['expected_class']?.toString() ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => kClassOptions.contains(s)),
+      );
 
     final allSubjects =
         kSubjectGroups.values.expand((s) => s).toSet().toList();
@@ -178,7 +139,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final provider = Provider.of<TeacherProvider>(context, listen: false);
     final data = {
-      'expected_class': _expectedClass ?? '',
+      'expected_class': _expectedClasses.join(', '),
       'expected_subject': _expectedSubjects.join(', '),
       'expected_medium': _expectedMedium ?? '',
       'day_per_week': _maxDaysPerWeek ?? '',
@@ -470,12 +431,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   title: 'Tuition Preferences',
                   children: _isEditing
                       ? [
-                          _DropdownField(
+                          _MultiSelectChips(
                             label: 'Expected Class',
-                            value: _expectedClass,
                             options: kClassOptions,
-                            onChanged: (v) =>
-                                setState(() => _expectedClass = v),
+                            selected: _expectedClasses,
+                            onChanged: () => setState(() {}),
                           ),
                           _SubjectPicker(
                             selected: _expectedSubjects,
@@ -497,7 +457,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 setState(() => _maxDaysPerWeek = v),
                           ),
                           _DropdownField(
-                            label: 'Minimum Salary',
+                            label: 'Expected Salary',
                             value: _minSalary,
                             options: kSalaryOptions,
                             onChanged: (v) => setState(() => _minSalary = v),
@@ -512,7 +472,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               profile['expected_medium'] ?? 'N/A'),
                           _InfoRow('Max Days Per Week',
                               '${profile['day_per_week'] ?? 'N/A'}'),
-                          _InfoRow('Minimum Salary',
+                          _InfoRow('Expected Salary',
                               '৳${profile['expected_salary'] ?? 'N/A'}'),
                         ],
                 ),
@@ -761,6 +721,63 @@ class _SubjectPicker extends StatelessWidget {
               }).toList(),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A flat multi-select chip list (e.g. Expected Class). Mirrors the
+/// registration screen's multi-select so values round-trip cleanly.
+class _MultiSelectChips extends StatelessWidget {
+  final String label;
+  final List<String> options;
+  final List<String> selected;
+  final VoidCallback onChanged;
+
+  const _MultiSelectChips({
+    required this.label,
+    required this.options,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 2,
+            children: options.map((option) {
+              final isSelected = selected.contains(option);
+              return FilterChip(
+                label: Text(option, style: const TextStyle(fontSize: 12)),
+                selected: isSelected,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onSelected: (val) {
+                  if (val) {
+                    if (!selected.contains(option)) selected.add(option);
+                  } else {
+                    selected.remove(option);
+                  }
+                  onChanged();
+                },
+              );
+            }).toList(),
+          ),
         ],
       ),
     );

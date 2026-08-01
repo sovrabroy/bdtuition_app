@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../models/demo_class.dart';
 import '../../providers/demo_provider.dart';
+import '../../providers/teacher_provider.dart';
 import '../../services/security_service.dart';
 import '../../services/api_service.dart';
 
@@ -30,18 +32,130 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
   // Set once a lookup succeeds so the "copy code" affordance can appear.
   bool _codeResolved = false;
 
+  // ---- Approved-tuition dropdown state ----
+  // Approved/assigned guardians (each has a tuition_code) that the teacher can
+  // pick from instead of typing a code by hand. Populated from /guardians.
+  bool _loadingApproved = false;
+  List<Map<String, dynamic>> _approved = [];
+  String? _selectedCode;
+
+  // Teacher's live GPS (origin) for the distance-to-guardian check.
+  double? _teacherLat;
+  double? _teacherLng;
+  double? _distanceMeters;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadApproved());
+  }
+
+  /// Loads the teacher's approved/assigned guardians so their tuition codes can
+  /// be offered in the dropdown. Only tuitions the admin has approved appear.
+  Future<void> _loadApproved() async {
+    setState(() => _loadingApproved = true);
+    try {
+      final provider = Provider.of<TeacherProvider>(context, listen: false);
+      await provider.loadGuardians();
+      final list = provider.guardians
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .where((g) => _pick(g, ['tuition_code']).isNotEmpty)
+          .toList();
+      if (!mounted) return;
+      setState(() => _approved = list);
+    } catch (_) {
+      // Silent — the manual code field still works if this fails.
+    } finally {
+      if (mounted) setState(() => _loadingApproved = false);
+    }
+  }
+
   /// Tolerant multi-key lookup: returns the first non-empty value among [keys].
   String _pick(Map<String, dynamic> data, List<String> keys) {
     for (final k in keys) {
       final v = data[k];
-      if (v != null && v.toString().trim().isNotEmpty) return v.toString().trim();
+      if (v != null && v.toString().trim().isNotEmpty &&
+          v.toString().trim().toLowerCase() != 'null') {
+        return v.toString().trim();
+      }
     }
     return '';
   }
 
-  /// Looks up an existing tuition by the entered code and auto-fills the
-  /// guardian/address fields from it. Nothing is faked — if the code isn't
-  /// found or the request fails, the user is told and fields are left alone.
+  double? _pickDouble(Map<String, dynamic> data, List<String> keys) {
+    for (final k in keys) {
+      final v = data[k];
+      if (v == null) continue;
+      final d = v is num ? v.toDouble() : double.tryParse(v.toString());
+      if (d != null) return d;
+    }
+    return null;
+  }
+
+  /// Fills guardian name / address / location from an approved guardian record.
+  /// Pulls the richer detail record when an assignment id is available so we
+  /// get the full address (and coordinates, if the backend stores them).
+  Future<void> _applyApprovedCode(String code) async {
+    final match = _approved.firstWhere(
+      (g) => _pick(g, ['tuition_code']) == code,
+      orElse: () => <String, dynamic>{},
+    );
+    if (match.isEmpty) return;
+
+    setState(() {
+      _selectedCode = code;
+      _codeCtrl.text = code;
+      _codeResolved = true;
+    });
+
+    // Seed from the summary record immediately.
+    _fillFromGuardian(match);
+
+    // Then try the detail endpoint for a fuller address / coordinates.
+    final assignmentId = match['assignment_id'] ?? match['id'];
+    if (assignmentId is int || (assignmentId is String && int.tryParse(assignmentId) != null)) {
+      final id = assignmentId is int ? assignmentId : int.parse(assignmentId);
+      setState(() => _looking = true);
+      try {
+        final provider = Provider.of<TeacherProvider>(context, listen: false);
+        final details = await provider.getGuardianDetails(id);
+        if (details != null && mounted) _fillFromGuardian(details);
+      } catch (_) {
+        // Keep the summary values already filled in.
+      } finally {
+        if (mounted) setState(() => _looking = false);
+      }
+    }
+  }
+
+  /// Applies guardian name / address / coordinates from a guardian map.
+  void _fillFromGuardian(Map<String, dynamic> g) {
+    final guardian =
+        _pick(g, ['guardian_name', 'guardian', 'name', 'contact_name']);
+    final address = _pick(g, ['address', 'full_address', 'tuition_address']);
+    final area = _pick(g, ['area', 'location']);
+    final city = _pick(g, ['city', 'district']);
+    final lat = _pickDouble(g, ['guardian_lat', 'lat', 'latitude']);
+    final lng = _pickDouble(g, ['guardian_lng', 'lng', 'longitude']);
+
+    setState(() {
+      if (guardian.isNotEmpty) _guardianCtrl.text = guardian;
+      if (address.isNotEmpty) {
+        _addressCtrl.text = address;
+      } else if (area.isNotEmpty || city.isNotEmpty) {
+        _addressCtrl.text = [area, city].where((s) => s.isNotEmpty).join(', ');
+      }
+      if (lat != null && lng != null) {
+        _guardianLat = lat;
+        _guardianLng = lng;
+      }
+    });
+    _recomputeDistance();
+  }
+
+  /// Manual lookup (typed code) — kept as a fallback for codes not in the
+  /// approved list. Nothing is faked: unknown codes just report "not found".
   Future<void> _lookupCode() async {
     final code = _codeCtrl.text.trim();
     if (code.isEmpty) {
@@ -65,21 +179,9 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
         return;
       }
       final t = Map<String, dynamic>.from(list.first as Map);
-      final area = _pick(t, ['area', 'location']);
-      final city = _pick(t, ['city', 'district']);
-      final guardian =
-          _pick(t, ['guardian_name', 'guardian', 'name', 'contact_name']);
-      final address = _pick(t, ['address', 'full_address', 'tuition_address']);
       if (!mounted) return;
-      setState(() {
-        _codeResolved = true;
-        if (guardian.isNotEmpty) _guardianCtrl.text = guardian;
-        if (address.isNotEmpty) {
-          _addressCtrl.text = address;
-        } else if (area.isNotEmpty || city.isNotEmpty) {
-          _addressCtrl.text = [area, city].where((s) => s.isNotEmpty).join(', ');
-        }
-      });
+      setState(() => _codeResolved = true);
+      _fillFromGuardian(t);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Tuition details imported.')),
       );
@@ -146,6 +248,7 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
         _guardianLat = pos.latitude;
         _guardianLng = pos.longitude;
       });
+      _recomputeDistance();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Guardian location pinned.')),
       );
@@ -158,6 +261,104 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
     } finally {
       if (mounted) setState(() => _pinning = false);
     }
+  }
+
+  /// Reads the teacher's live GPS and computes the straight-line distance to
+  /// the guardian's location (when both are known).
+  Future<void> _checkDistance() async {
+    if (_guardianLat == null || _guardianLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Pin the guardian location first, or select an '
+                'approved code that includes it.')),
+      );
+      return;
+    }
+    setState(() => _pinning = true);
+    try {
+      final pos = await SecurityService.getCurrentPosition();
+      if (!mounted) return;
+      setState(() {
+        _teacherLat = pos.latitude;
+        _teacherLng = pos.longitude;
+      });
+      _recomputeDistance();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pinning = false);
+    }
+  }
+
+  void _recomputeDistance() {
+    if (_teacherLat != null &&
+        _teacherLng != null &&
+        _guardianLat != null &&
+        _guardianLng != null) {
+      _distanceMeters = SecurityService.distanceBetween(
+        _teacherLat!,
+        _teacherLng!,
+        _guardianLat!,
+        _guardianLng!,
+      );
+    } else {
+      _distanceMeters = null;
+    }
+    if (mounted) setState(() {});
+  }
+
+  /// Opens Google Maps directions from the teacher's live GPS (origin) to the
+  /// guardian's location — pinned coordinates if we have them, else the typed
+  /// address. Lets the teacher see the real route & travel distance.
+  Future<void> _openDirections() async {
+    // Destination: prefer exact coordinates, fall back to the address text.
+    final String destination;
+    if (_guardianLat != null && _guardianLng != null) {
+      destination = '$_guardianLat,$_guardianLng';
+    } else if (_addressCtrl.text.trim().isNotEmpty) {
+      destination = _addressCtrl.text.trim();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No guardian location or address yet.')),
+      );
+      return;
+    }
+
+    final params = <String, String>{
+      'api': '1',
+      'destination': destination,
+      'travelmode': 'driving',
+    };
+    // Origin is optional — if we have the teacher's GPS, use it so the route
+    // starts exactly from the teacher. Otherwise Maps uses the device location.
+    if (_teacherLat != null && _teacherLng != null) {
+      params['origin'] = '$_teacherLat,$_teacherLng';
+    }
+
+    final uri = Uri.https('www.google.com', '/maps/dir/', params);
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open Google Maps')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open Google Maps')),
+        );
+      }
+    }
+  }
+
+  String _formatDistance(double meters) {
+    if (meters < 1000) return '${meters.toStringAsFixed(0)} m';
+    return '${(meters / 1000).toStringAsFixed(2)} km';
   }
 
   Future<void> _save() async {
@@ -192,10 +393,34 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // ---- Approved tuition code dropdown ----
+            // Only tuitions the admin approved show up here. Picking one fills
+            // the code + guardian name + address automatically.
+            _ApprovedCodeDropdown(
+              loading: _loadingApproved,
+              approved: _approved,
+              selected: _selectedCode,
+              codeOf: (g) => _pick(g, ['tuition_code']),
+              labelOf: (g) {
+                final code = _pick(g, ['tuition_code']);
+                final area = _pick(g, ['area', 'location']);
+                final city = _pick(g, ['city', 'district']);
+                final where =
+                    [area, city].where((s) => s.isNotEmpty).join(', ');
+                return where.isEmpty ? code : '$code — $where';
+              },
+              onRefresh: _loadApproved,
+              onChanged: (code) {
+                if (code != null) _applyApprovedCode(code);
+              },
+            ),
+            const SizedBox(height: 14),
             TextFormField(
               controller: _codeCtrl,
               decoration: InputDecoration(
                 labelText: 'Tuition Code',
+                helperText:
+                    'Pick an approved code above, or type one and import.',
                 prefixIcon: const Icon(Icons.tag),
                 border: const OutlineInputBorder(),
                 suffixIcon: Row(
@@ -307,6 +532,58 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 14),
+
+            // ---- Distance: teacher → guardian ----
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.black26),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.directions, size: 20),
+                      SizedBox(width: 8),
+                      Text('Distance to Guardian',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _distanceMeters != null
+                        ? 'About ${_formatDistance(_distanceMeters!)} from your current location (straight line).'
+                        : 'Tap below to measure the distance from where you are '
+                            'now to the guardian address.',
+                    style: const TextStyle(
+                        color: Colors.black54, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pinning ? null : _checkDistance,
+                          icon: const Icon(Icons.straighten, size: 18),
+                          label: const Text('Check distance'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _openDirections,
+                          icon: const Icon(Icons.map, size: 18),
+                          label: const Text('Open in Maps'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 24),
             SizedBox(
               height: 50,
@@ -318,6 +595,97 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Dropdown of the teacher's approved tuition codes. Shows a friendly empty /
+/// loading state so it never looks broken when there are no approvals yet.
+class _ApprovedCodeDropdown extends StatelessWidget {
+  final bool loading;
+  final List<Map<String, dynamic>> approved;
+  final String? selected;
+  final String Function(Map<String, dynamic>) codeOf;
+  final String Function(Map<String, dynamic>) labelOf;
+  final VoidCallback onRefresh;
+  final ValueChanged<String?> onChanged;
+
+  const _ApprovedCodeDropdown({
+    required this.loading,
+    required this.approved,
+    required this.selected,
+    required this.codeOf,
+    required this.labelOf,
+    required this.onRefresh,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.verified, size: 20, color: AppTheme.primaryColor),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Approved Tuition Code',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+              if (loading)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                IconButton(
+                  tooltip: 'Refresh',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.refresh, size: 20),
+                  onPressed: onRefresh,
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (!loading && approved.isEmpty)
+            const Text(
+              'No approved tuitions yet. Once the admin approves your '
+              'application, its code will appear here.',
+              style: TextStyle(color: Colors.black54, fontSize: 13),
+            )
+          else
+            DropdownButtonFormField<String>(
+              value: selected,
+              isExpanded: true,
+              hint: const Text('Select an approved code'),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              items: approved
+                  .map((g) => codeOf(g))
+                  .where((c) => c.isNotEmpty)
+                  .toSet()
+                  .map((code) {
+                final g = approved.firstWhere((e) => codeOf(e) == code);
+                return DropdownMenuItem(value: code, child: Text(labelOf(g)));
+              }).toList(),
+              onChanged: onChanged,
+            ),
+        ],
       ),
     );
   }

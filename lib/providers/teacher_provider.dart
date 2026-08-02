@@ -110,6 +110,23 @@ class TeacherProvider with ChangeNotifier {
     return null;
   }
 
+  /// Triggers a masked call to the guardian via the backend (Issabel). The
+  /// guardian's number never reaches the app. Returns the backend result map
+  /// {success, message} — on success the teacher's phone will ring shortly.
+  Future<Map<String, dynamic>> callGuardian(int assignmentId) async {
+    try {
+      final response = await _api.callGuardian(assignmentId);
+      final data = response.data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return {'success': false, 'message': 'Unexpected response.'};
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Could not place the call. Please try again.',
+      };
+    }
+  }
+
   Future<void> loadReports() async {
     _isLoading = true;
     notifyListeners();

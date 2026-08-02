@@ -193,6 +193,15 @@ class ApiService {
     return await _dio.post('${ApiConfig.guardians}/$assignmentId/reveal');
   }
 
+  /// Masked click-to-call. The backend looks up the guardian's number
+  /// server-side and asks Issabel (Asterisk) to originate a bridged call:
+  /// the teacher's own phone rings first, and on answer it connects to the
+  /// guardian. The guardian's number is NEVER returned to the app, so the
+  /// teacher can talk to the guardian without ever seeing their number.
+  Future<Response> callGuardian(int assignmentId) async {
+    return await _dio.post(ApiConfig.guardianCall(assignmentId));
+  }
+
   // ==================== REPORTS ====================
 
   Future<Response> getReports() async {

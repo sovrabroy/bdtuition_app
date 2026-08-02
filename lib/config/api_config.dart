@@ -25,6 +25,11 @@ class ApiConfig {
 
   // Guardians
   static const String guardians = '/guardians';
+  // Masked click-to-call: backend originates the call via Issabel (Asterisk).
+  // The guardian number never comes to the app — the teacher only triggers a
+  // call and their own phone rings, then gets bridged to the guardian.
+  static String guardianCall(int assignmentId) =>
+      '/guardians/$assignmentId/call';
 
   // Reports
   static const String reports = '/reports';

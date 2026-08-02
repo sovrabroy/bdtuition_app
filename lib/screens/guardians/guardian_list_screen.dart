@@ -86,7 +86,7 @@ class _GuardianListScreenState extends State<GuardianListScreen> {
               return _GuardianCard(
                 guardian: guardian,
                 onTap: () => _showGuardianDetails(guardian),
-                onReveal: () => _revealGuardian(guardian),
+                onCall: () => _callGuardian(guardian),
               );
             },
           ),
@@ -177,11 +177,12 @@ class _GuardianListScreenState extends State<GuardianListScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Guardian info
+                  // Guardian info. The phone number is intentionally NOT
+                  // shown — the teacher can only reach the guardian through the
+                  // masked "Call Guardian" button, which routes via Issabel so
+                  // the real number is never exposed.
                   _DetailItem('Guardian Name',
                       details['guardian_name'] ?? 'N/A'),
-                  _DetailItem('Phone',
-                      details['guardian_phone'] ?? details['phone'] ?? 'N/A'),
                   _DetailItem('Address',
                       details['address'] ?? 'N/A'),
                   _DetailItem('Area',
@@ -198,6 +199,24 @@ class _GuardianListScreenState extends State<GuardianListScreen> {
                       '${details['day_per_week'] ?? 'N/A'}'),
                   const SizedBox(height: 16),
 
+                  // Call button — masked call via Issabel.
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _callGuardian(guardian);
+                      },
+                      icon: const Icon(Icons.call),
+                      label: const Text('Call Guardian'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.successColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   // Close button
                   SizedBox(
                     width: double.infinity,
@@ -215,14 +234,25 @@ class _GuardianListScreenState extends State<GuardianListScreen> {
     );
   }
 
-  void _revealGuardian(Map<String, dynamic> guardian) async {
+  /// Places a masked call to the guardian. The guardian's number is never
+  /// shown to the teacher — the backend originates the call through Issabel:
+  /// the teacher's own phone rings first, then gets bridged to the guardian.
+  void _callGuardian(Map<String, dynamic> guardian) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Reveal Guardian Number'),
+        title: const Row(
+          children: [
+            Icon(Icons.call, color: AppTheme.successColor),
+            SizedBox(width: 8),
+            Text('Call Guardian'),
+          ],
+        ),
         content: const Text(
-          'Are you sure you want to reveal the guardian\'s contact number? This action may be limited.',
+          'We will connect you to the guardian. Your own phone will ring in a '
+          'few seconds — pick it up and you will be connected. The guardian\'s '
+          'number stays private.',
         ),
         actions: [
           TextButton(
@@ -231,7 +261,7 @@ class _GuardianListScreenState extends State<GuardianListScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Reveal'),
+            child: const Text('Call'),
           ),
         ],
       ),
@@ -247,89 +277,38 @@ class _GuardianListScreenState extends State<GuardianListScreen> {
     );
 
     final provider = Provider.of<TeacherProvider>(context, listen: false);
-    final result =
-        await provider.revealGuardian(guardian['assignment_id'] ?? guardian['id']);
+    final result = await provider
+        .callGuardian(guardian['assignment_id'] ?? guardian['id']);
 
     if (!mounted) return;
     Navigator.pop(context); // dismiss loading
 
-    if (result != null && result['success'] == true) {
-      final phone = result['data']?['phone'] ?? result['phone'] ?? 'N/A';
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.phone, color: AppTheme.successColor),
-              SizedBox(width: 8),
-              Text('Guardian Number'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.successColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  phone.toString(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.successColor,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-              if (result['data']?['guardian_name'] != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  result['data']['guardian_name'],
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
-          ],
+    final success = result['success'] == true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? (result['message']?.toString() ??
+                  'Connecting… your phone will ring shortly.')
+              : (result['message']?.toString() ??
+                  'Could not place the call. Please try again.'),
         ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result?['message'] ?? 'Failed to reveal guardian number',
-          ),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
-    }
+        backgroundColor:
+            success ? AppTheme.successColor : AppTheme.errorColor,
+      ),
+    );
   }
 }
 
 class _GuardianCard extends StatelessWidget {
   final Map<String, dynamic> guardian;
   final VoidCallback onTap;
-  final VoidCallback onReveal;
+  final VoidCallback onCall;
 
   const _GuardianCard({
     required this.guardian,
     required this.onTap,
-    required this.onReveal,
+    required this.onCall,
   });
 
   @override
@@ -450,10 +429,12 @@ class _GuardianCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: onReveal,
-                      icon: const Icon(Icons.visibility, size: 18),
-                      label: const Text('Reveal Number'),
+                      onPressed: onCall,
+                      icon: const Icon(Icons.call, size: 18),
+                      label: const Text('Call Guardian'),
                       style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.successColor,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         textStyle: const TextStyle(fontSize: 13),
                       ),

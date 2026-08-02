@@ -6,10 +6,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../models/demo_class.dart';
 import '../../providers/demo_provider.dart';
+import '../../services/location_logger.dart';
 import 'add_demo_screen.dart';
 import 'check_in_screen.dart';
 import 'checkin_history_screen.dart';
 import 'visit_proof_screen.dart';
+import 'verify_otp_screen.dart';
 
 class DemoDashboardScreen extends StatefulWidget {
   const DemoDashboardScreen({super.key});
@@ -26,6 +28,9 @@ class _DemoDashboardScreenState extends State<DemoDashboardScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<DemoProvider>(context, listen: false).load();
+      // Silently log location when the teacher opens the demo screen (only if
+      // permission is already granted — never prompts from here).
+      LocationLogger.log(context: 'demo_screen');
     });
     // Rebuild every second so countdowns stay live.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -337,6 +342,30 @@ class _DemoDashboardScreenState extends State<DemoDashboardScreen> {
                 ],
               ),
             ],
+            if (demo.otpStatus == 'verified') ...[
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.successColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified,
+                        size: 15, color: AppTheme.successColor),
+                    SizedBox(width: 6),
+                    Text('OTP verified at guardian\'s home',
+                        style: TextStyle(
+                            color: AppTheme.successColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [
@@ -349,7 +378,17 @@ class _DemoDashboardScreenState extends State<DemoDashboardScreen> {
                     ),
                   ),
                 if (demo.hasGuardianLocation) const SizedBox(width: 8),
-                if (isActive)
+                // Server-backed demos use the OTP flow (the real proof). Only
+                // fall back to the old local check-in if there is no server id.
+                if (isActive && demo.serverId != null && demo.otpStatus != 'verified')
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openOtpVerify(demo),
+                      icon: const Icon(Icons.password, size: 18),
+                      label: const Text('Enter OTP'),
+                    ),
+                  )
+                else if (isActive && demo.serverId == null)
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => _startCheckIn(demo),
@@ -465,6 +504,16 @@ class _DemoDashboardScreenState extends State<DemoDashboardScreen> {
       context,
       MaterialPageRoute(builder: (_) => CheckInScreen(demo: demo)),
     );
+  }
+
+  Future<void> _openOtpVerify(DemoClass demo) async {
+    final verified = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => VerifyOtpScreen(demo: demo)),
+    );
+    if (verified == true && mounted) {
+      Provider.of<DemoProvider>(context, listen: false).load();
+    }
   }
 
   Future<void> _openVisitProof(DemoClass demo) async {

@@ -7,9 +7,22 @@ import 'check_in.dart';
 /// teacher cannot falsely claim they attended a demo.
 class DemoClass {
   final String id;
+
+  /// Server-side demo_schedules.id once this demo has been scheduled on the
+  /// backend. Null until the schedule call succeeds. Used to run OTP verify.
+  int? serverId;
+
+  /// Backend tuition id (tuitions.id) this demo belongs to. Lets us tag
+  /// location logs so the admin can count visits near this tuition's address.
+  final int? tuitionId;
+
   final String tuitionCode;
   final String guardianName;
   final String address;
+
+  /// 'not_sent' | 'otp_sent' | 'verified' — mirrors the server demo status so
+  /// the UI can show whether the OTP has been sent / the demo verified.
+  String otpStatus;
 
   /// Guardian location (destination) — used for distance + navigation.
   final double? guardianLat;
@@ -26,6 +39,8 @@ class DemoClass {
 
   DemoClass({
     required this.id,
+    this.serverId,
+    this.tuitionId,
     required this.tuitionCode,
     required this.guardianName,
     required this.address,
@@ -33,6 +48,7 @@ class DemoClass {
     this.guardianLng,
     required this.scheduledAt,
     this.status = 'pending',
+    this.otpStatus = 'not_sent',
     List<CheckIn>? checkIns,
   }) : checkIns = checkIns ?? [];
 
@@ -101,6 +117,8 @@ class DemoClass {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'server_id': serverId,
+        'tuition_id': tuitionId,
         'tuition_code': tuitionCode,
         'guardian_name': guardianName,
         'address': address,
@@ -108,11 +126,14 @@ class DemoClass {
         'guardian_lng': guardianLng,
         'scheduled_at': scheduledAt.toIso8601String(),
         'status': status,
+        'otp_status': otpStatus,
         'check_ins': checkIns.map((c) => c.toJson()).toList(),
       };
 
   factory DemoClass.fromJson(Map<String, dynamic> json) => DemoClass(
         id: json['id'] as String,
+        serverId: (json['server_id'] as num?)?.toInt(),
+        tuitionId: (json['tuition_id'] as num?)?.toInt(),
         tuitionCode: json['tuition_code'] as String? ?? '',
         guardianName: json['guardian_name'] as String? ?? '',
         address: json['address'] as String? ?? '',
@@ -121,6 +142,7 @@ class DemoClass {
         scheduledAt: DateTime.tryParse(json['scheduled_at'] as String? ?? '') ??
             DateTime.now(),
         status: json['status'] as String? ?? 'pending',
+        otpStatus: json['otp_status'] as String? ?? 'not_sent',
         checkIns: (json['check_ins'] as List?)
                 ?.map((c) => CheckIn.fromJson(Map<String, dynamic>.from(c)))
                 .toList() ??

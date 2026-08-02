@@ -4,6 +4,7 @@ import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/teacher_provider.dart';
 import '../../services/nearby_tuition_notifier.dart';
+import '../../services/location_logger.dart';
 import '../auth/login_screen.dart';
 import 'dashboard_screen.dart';
 import '../tuitions/tuition_list_screen.dart';
@@ -35,6 +36,9 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<TeacherProvider>(context, listen: false).loadDashboard();
       _startNearbyNotifier();
+      // Best-effort location ping so the admin 30-day trail builds up over
+      // normal use. Silent — only logs if permission is already granted.
+      LocationLogger.log(context: 'app_open');
     });
   }
 

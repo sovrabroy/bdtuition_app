@@ -43,6 +43,10 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
   double? _teacherLat;
   double? _teacherLng;
 
+  // Backend tuition id resolved from the selected/looked-up code. Needed so the
+  // server can pull the guardian's phone + address and send the OTP.
+  int? _tuitionId;
+
   @override
   void initState() {
     super.initState();
@@ -126,6 +130,28 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
         if (mounted) setState(() => _looking = false);
       }
     }
+
+    // Make sure we have the backend tuition id (the OTP flow needs it). If the
+    // guardian record didn't carry one, resolve it from the code via /tuitions.
+    if (_tuitionId == null) await _resolveTuitionId(code);
+  }
+
+  /// Silently resolves the backend tuition id for [code] via /tuitions so the
+  /// server can pull the guardian phone + address when scheduling.
+  Future<void> _resolveTuitionId(String code) async {
+    try {
+      final response = await _api.getTuitions(tuitionCode: code);
+      final data = response.data;
+      final list = (data is Map && data['success'] == true)
+          ? (data['data'] as List? ?? [])
+          : const [];
+      if (list.isEmpty) return;
+      final t = Map<String, dynamic>.from(list.first as Map);
+      final tid = _pickDouble(t, ['tuition_id', 'id'])?.toInt();
+      if (tid != null && mounted) setState(() => _tuitionId = tid);
+    } catch (_) {
+      // Non-fatal — save will warn if we still have no tuition id.
+    }
   }
 
   /// Applies guardian name / address / coordinates from a guardian map.
@@ -137,8 +163,10 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
     final city = _pick(g, ['city', 'district']);
     final lat = _pickDouble(g, ['guardian_lat', 'lat', 'latitude']);
     final lng = _pickDouble(g, ['guardian_lng', 'lng', 'longitude']);
+    final tid = _pickDouble(g, ['tuition_id'])?.toInt();
 
     setState(() {
+      if (tid != null) _tuitionId = tid;
       if (guardian.isNotEmpty) _guardianCtrl.text = guardian;
       if (address.isNotEmpty) {
         _addressCtrl.text = address;
@@ -178,7 +206,12 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
       }
       final t = Map<String, dynamic>.from(list.first as Map);
       if (!mounted) return;
-      setState(() => _codeResolved = true);
+      // In a tuition record, `id` is the tuition id the server needs.
+      final tid = _pickDouble(t, ['tuition_id', 'id'])?.toInt();
+      setState(() {
+        _codeResolved = true;
+        if (tid != null) _tuitionId = tid;
+      });
       _fillFromGuardian(t);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Tuition details imported.')),
@@ -309,20 +342,61 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // The OTP flow is server-backed and needs the backend tuition id so it can
+    // reach the guardian's phone. Block save (with a clear message) if missing.
+    if (_tuitionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Could not resolve this tuition on the server. Pick an approved '
+              'code or import a valid code before saving.'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
+
+    // Destination for distance checks: prefer the guardian's pinned coordinates,
+    // otherwise fall back to where the teacher pinned themselves at the address.
+    final destLat = _guardianLat ?? _teacherLat;
+    final destLng = _guardianLng ?? _teacherLng;
 
     final demo = DemoClass(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      tuitionId: _tuitionId,
       tuitionCode: _codeCtrl.text.trim(),
       guardianName: _guardianCtrl.text.trim(),
       address: _addressCtrl.text.trim(),
-      guardianLat: _guardianLat,
-      guardianLng: _guardianLng,
+      guardianLat: destLat,
+      guardianLng: destLng,
       scheduledAt: _scheduledAt,
     );
 
-    await Provider.of<DemoProvider>(context, listen: false).addDemo(demo);
+    final provider = Provider.of<DemoProvider>(context, listen: false);
+
+    // Register on the backend first so the OTP can be scheduled. Only persist
+    // locally once we have the server id, so the dashboard can open OTP verify.
+    final ok = await provider.scheduleOnServer(demo);
+    if (!ok) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.lastError ?? 'Could not save demo.')),
+      );
+      return;
+    }
+
+    await provider.addDemo(demo);
     if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+            'Demo scheduled. An OTP will be sent to the guardian ~2 hours '
+            'before the demo time.'),
+      ),
+    );
     Navigator.pop(context);
   }
 

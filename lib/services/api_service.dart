@@ -244,4 +244,81 @@ class ApiService {
   Future<Response> registerFcmToken(String token) async {
     return await _dio.post(ApiConfig.fcmToken, data: {'token': token});
   }
+
+  // ==================== DEMO VERIFICATION (OTP anti-fraud) ====================
+
+  /// Teacher's own scheduled demos (server-side). Backend GET /demo.
+  Future<Response> getDemos() async {
+    return await _dio.get(ApiConfig.demos);
+  }
+
+  /// Schedule a demo. The backend pulls the guardian's phone + address from the
+  /// tuition record itself (so the teacher can't fake them) and later auto-sends
+  /// the OTP 2 hours before [scheduledAt] via cron.
+  Future<Response> scheduleDemo({
+    int? tuitionId,
+    int? assignmentId,
+    required DateTime scheduledAt,
+    double? guardianLat,
+    double? guardianLng,
+  }) async {
+    final data = <String, dynamic>{
+      'scheduled_at': scheduledAt.toIso8601String(),
+    };
+    if (tuitionId != null) data['tuition_id'] = tuitionId;
+    if (assignmentId != null) data['assignment_id'] = assignmentId;
+    if (guardianLat != null) data['guardian_lat'] = guardianLat;
+    if (guardianLng != null) data['guardian_lng'] = guardianLng;
+    return await _dio.post(ApiConfig.demoSchedule, data: data);
+  }
+
+  /// Teacher pastes the OTP the guardian gave them, together with their own live
+  /// GPS + device-integrity flags. The server checks the code and records where
+  /// the teacher actually was (distance from the guardian address) so a remote
+  /// paste / fake location is caught.
+  Future<Response> verifyDemoOtp({
+    required int demoId,
+    required String otp,
+    required double lat,
+    required double lng,
+    bool isMock = false,
+    bool isRooted = false,
+  }) async {
+    return await _dio.post(ApiConfig.demoVerifyOtp(demoId), data: {
+      'otp': otp,
+      'lat': lat,
+      'lng': lng,
+      'is_mock': isMock,
+      'is_rooted': isRooted,
+    });
+  }
+
+  /// Ask the backend to send a fresh OTP to the guardian's phone.
+  Future<Response> resendDemoOtp(int demoId) async {
+    return await _dio.post(ApiConfig.demoResendOtp(demoId));
+  }
+
+  /// Report the teacher's current location to the rolling 30-day log. Called
+  /// when the app is used (app open / opening the demo screen / OTP verify),
+  /// not as continuous background tracking.
+  Future<Response> logLocation({
+    int? tuitionId,
+    required double lat,
+    required double lng,
+    double? accuracy,
+    bool isMock = false,
+    bool isRooted = false,
+    String context = 'app_open',
+  }) async {
+    final data = <String, dynamic>{
+      'lat': lat,
+      'lng': lng,
+      'is_mock': isMock,
+      'is_rooted': isRooted,
+      'context': context,
+    };
+    if (tuitionId != null) data['tuition_id'] = tuitionId;
+    if (accuracy != null) data['accuracy'] = accuracy;
+    return await _dio.post(ApiConfig.locationLog, data: data);
+  }
 }

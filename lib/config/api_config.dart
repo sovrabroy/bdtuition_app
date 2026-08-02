@@ -41,6 +41,17 @@ class ApiConfig {
   // FCM
   static const String fcmToken = '/fcm-token';
 
+  // Demo verification (OTP anti-fraud). Everything is stored server-side so the
+  // admin panel can audit; nothing is device-only.
+  static const String demos = '/demo'; // GET list, POST /demo/schedule
+  static const String demoSchedule = '/demo/schedule';
+  // Per-demo actions take the server demo id: /demo/{id}/verify-otp etc.
+  static String demoVerifyOtp(int id) => '/demo/$id/verify-otp';
+  static String demoResendOtp(int id) => '/demo/$id/resend-otp';
+
+  // Rolling teacher location log (sent when the app is used, not in background).
+  static const String locationLog = '/location/log';
+
   /// Resolve a photo/document path returned by the API into a full URL.
   /// Handles: already-absolute URLs, paths that already include "uploads/",
   /// and bare filenames (which get the teacher-documents base prefixed).

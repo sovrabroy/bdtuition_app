@@ -56,6 +56,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _maxDaysPerWeek;
   String? _minSalary;
 
+  // Location (editable): city/district, single living area, and one-or-more
+  // expected tuition areas.
+  String? _city;
+  String? _area;
+  final List<String> _expectedAreas = [];
+
   // Selected academic year for the Education section.
   String? _academicYear;
 
@@ -125,6 +131,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _universityNameController.text = profile['university_name'] ?? '';
     _presentAddressController.text = profile['present_address'] ?? '';
     _permanentAddressController.text = profile['permanent_address'] ?? '';
+
+    // Location: city must be a known district, otherwise leave unset so the
+    // dropdown doesn't crash on a stray value. Area/expected areas are seeded
+    // only if they belong to the chosen city's area list.
+    _city = _matchOption(profile['city']?.toString(), kBdDistricts);
+    final cityAreas = kBdAreasFor(_city);
+    _area = _matchOption(profile['area']?.toString(), cityAreas);
+    _expectedAreas
+      ..clear()
+      ..addAll(
+        (profile['expected_area']?.toString() ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => cityAreas.contains(s)),
+      );
   }
 
   /// Returns [value] only if it exactly matches one of [options], else null.
@@ -139,6 +160,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final provider = Provider.of<TeacherProvider>(context, listen: false);
     final data = {
+      'city': _city ?? '',
+      'area': _area ?? '',
+      'expected_area': _expectedAreas.join(', '),
       'expected_class': _expectedClasses.join(', '),
       'expected_subject': _expectedSubjects.join(', '),
       'expected_medium': _expectedMedium ?? '',
@@ -327,6 +351,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _InfoRow(
                         'National ID', profile['national_id'] ?? 'N/A'),
                   ],
+                ),
+                const SizedBox(height: 12),
+
+                // Location (editable)
+                _SectionCard(
+                  title: 'Location',
+                  children: _isEditing
+                      ? [
+                          _DropdownField(
+                            label: 'City / District',
+                            value: _city,
+                            options: kBdDistricts,
+                            onChanged: (v) => setState(() {
+                              _city = v;
+                              // Reset area selections when the city changes so
+                              // stale areas from another district don't linger.
+                              _area = null;
+                              _expectedAreas.clear();
+                            }),
+                          ),
+                          _DropdownField(
+                            label: 'Living Area',
+                            value: _area,
+                            options: kBdAreasFor(_city),
+                            onChanged: (v) => setState(() => _area = v),
+                          ),
+                          _MultiSelectChips(
+                            label: 'Expected Tuition Areas',
+                            options: kBdAreasFor(_city),
+                            selected: _expectedAreas,
+                            onChanged: () => setState(() {}),
+                          ),
+                        ]
+                      : [
+                          _InfoRow('City', profile['city'] ?? 'N/A'),
+                          _InfoRow('Living Area', profile['area'] ?? 'N/A'),
+                          _InfoRow('Expected Areas',
+                              profile['expected_area'] ?? 'N/A'),
+                        ],
                 ),
                 const SizedBox(height: 12),
 

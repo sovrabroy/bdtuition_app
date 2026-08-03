@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
@@ -64,7 +65,28 @@ class TeacherProvider with ChangeNotifier {
       final response = await _api.updateProfile(data);
       if (response.data['success'] == true) {
         await loadProfile();
+        _isLoading = false;
+        notifyListeners();
         return true;
+      }
+      // Backend responded but success != true — surface its message.
+      _error = response.data['message']?.toString() ?? 'Failed to update profile';
+    } on DioException catch (e) {
+      // Surface the real server error (validation, auth, etc.) instead of a
+      // generic message, and log the body for debugging.
+      // ignore: avoid_print
+      print('updateProfile FAILED status=${e.response?.statusCode} body=${e.response?.data}');
+      final body = e.response?.data;
+      if (body is Map && body['message'] != null) {
+        _error = body['message'].toString();
+      } else if (body is Map && body['errors'] is Map) {
+        // Laravel validation errors: {"errors":{"field":["msg"]}}
+        final firstField = (body['errors'] as Map).values.first;
+        _error = firstField is List && firstField.isNotEmpty
+            ? firstField.first.toString()
+            : 'Validation failed';
+      } else {
+        _error = e.message ?? 'Failed to update profile';
       }
     } catch (e) {
       _error = 'Failed to update profile';

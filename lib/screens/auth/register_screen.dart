@@ -173,7 +173,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    final result = await auth.register({'formData': formData});
+    final result = await auth.register(formData);
 
     if (!mounted) return;
 

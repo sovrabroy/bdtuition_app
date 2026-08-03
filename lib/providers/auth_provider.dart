@@ -71,13 +71,13 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> register(Map<String, dynamic> formData) async {
+  Future<Map<String, dynamic>> register(FormData formData) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _api.register(_buildFormData(formData));
+      final response = await _api.register(formData);
       final data = response.data;
 
       _isLoading = false;
@@ -183,11 +183,6 @@ class AuthProvider with ChangeNotifier {
     await _api.clearToken();
     _teacher = null;
     notifyListeners();
-  }
-
-  dynamic _buildFormData(Map<String, dynamic> data) {
-    // For multipart form data with files
-    return data;
   }
 
   String _getErrorMessage(dynamic e) {

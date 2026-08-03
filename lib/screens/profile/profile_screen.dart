@@ -168,7 +168,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          success ? 'Profile updated successfully!' : 'Failed to update profile',
+          success
+              ? 'Profile updated successfully!'
+              : (provider.error ?? 'Failed to update profile'),
         ),
         backgroundColor: success ? AppTheme.successColor : AppTheme.errorColor,
       ),

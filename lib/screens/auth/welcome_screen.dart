@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../config/theme.dart';
+import '../../providers/tuition_provider.dart';
+import '../tuitions/public_tuitions_screen.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import '../guardian/guardian_login_screen.dart';
@@ -12,8 +15,23 @@ import '../guardian/guardian_login_screen.dart';
 ///   - "Sign In"         -> existing Teacher login
 ///
 /// This only ADDS an entry point; the existing teacher flow is untouched.
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Pull the public available-tuition count so we can show it below the
+    // Sign In button. Needs no auth token.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<TuitionProvider>(context, listen: false).loadTuitionCount();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -162,6 +180,82 @@ class WelcomeScreen extends StatelessWidget {
                             'Sign In',
                             style: TextStyle(fontWeight: FontWeight.w600),
                           ),
+                        ),
+
+                        // Available-tuition count + View All button. Works
+                        // logged-out so guardians/teachers can browse before
+                        // signing in.
+                        const SizedBox(height: 20),
+                        const Divider(),
+                        const SizedBox(height: 12),
+                        Consumer<TuitionProvider>(
+                          builder: (context, tp, _) {
+                            final count = tp.availableCount;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.school_outlined,
+                                      size: 18,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: count != null
+                                                ? '$count '
+                                                : '',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                              color: AppTheme.primaryColor,
+                                            ),
+                                          ),
+                                          const TextSpan(
+                                            text: 'tuitions available now',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: AppTheme.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                OutlinedButton.icon(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const PublicTuitionsScreen(),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.list_alt, size: 18),
+                                  label: const Text('View All Tuitions'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppTheme.primaryColor,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    side: const BorderSide(
+                                      color: AppTheme.primaryColor,
+                                      width: 1.5,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),

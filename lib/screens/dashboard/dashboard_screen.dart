@@ -114,49 +114,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Stats cards
+                // Main navigation cards. Total Paid / Pending Due now live in
+                // the Payment section, and Active Tuitions in the Guardian
+                // section — so the dashboard just routes to the four areas.
                 Row(
                   children: [
-                    _StatCard(
-                      icon: Icons.school,
-                      label: 'Active Tuitions',
-                      value: '${data['active_assignments'] ?? 0}',
+                    _NavCard(
+                      icon: Icons.book_online,
+                      label: 'Tuition',
                       color: AppTheme.primaryColor,
-                      onTap: () => widget.onNavigateTab?.call(3),
+                      onTap: () => widget.onNavigateTab?.call(1),
                     ),
                     const SizedBox(width: 12),
-                    _StatCard(
-                      icon: Icons.book_online,
-                      label: 'Available',
-                      value: '${data['available_tuitions'] ?? 0}',
-                      color: AppTheme.successColor,
-                      onTap: () => widget.onNavigateTab?.call(1),
+                    _NavCard(
+                      icon: Icons.verified_user,
+                      label: 'Demo',
+                      color: AppTheme.secondaryColor,
+                      onTap: () => widget.onNavigateTab?.call(2),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _StatCard(
-                      icon: Icons.attach_money,
-                      label: 'Total Paid',
-                      value: '৳${data['total_earnings'] ?? 0}',
-                      color: AppTheme.accentColor,
-                      onTap: () => widget.onNavigateTab?.call(4),
+                    _NavCard(
+                      icon: Icons.people,
+                      label: 'Guardian Number',
+                      color: AppTheme.successColor,
+                      onTap: () => widget.onNavigateTab?.call(3),
                     ),
                     const SizedBox(width: 12),
-                    _StatCard(
-                      icon: Icons.pending_actions,
-                      label: 'Pending Due',
-                      value: '৳${data['pending_due'] ?? 0}',
-                      color: AppTheme.errorColor,
+                    _NavCard(
+                      icon: Icons.payment,
+                      label: 'Payment',
+                      color: AppTheme.accentColor,
                       onTap: () => widget.onNavigateTab?.call(4),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
 
-                // Recent Applications
+                // Applied / Recent Applications
                 const Text('Recent Applications', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 if (data['recent_applications'] != null && (data['recent_applications'] as List).isNotEmpty)
@@ -225,17 +223,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _StatCard extends StatelessWidget {
+class _NavCard extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String value;
   final Color color;
   final VoidCallback? onTap;
 
-  const _StatCard({
+  const _NavCard({
     required this.icon,
     required this.label,
-    required this.value,
     required this.color,
     this.onTap,
   });
@@ -250,7 +246,7 @@ class _StatCard extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
@@ -258,25 +254,24 @@ class _StatCard extends StatelessWidget {
             ),
             child: Column(
               children: [
-                Icon(icon, color: color, size: 28),
-                const SizedBox(height: 8),
-                Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-                const SizedBox(height: 4),
-                Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                if (onTap != null) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('View',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: color,
-                              fontWeight: FontWeight.w600)),
-                      Icon(Icons.chevron_right, size: 14, color: color),
-                    ],
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    shape: BoxShape.circle,
                   ),
-                ],
+                  child: Icon(icon, color: color, size: 30),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
               ],
             ),
           ),

@@ -19,7 +19,13 @@ class _PaymentScreenState extends State<PaymentScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<TeacherProvider>(context, listen: false).loadPayments();
+      final provider = Provider.of<TeacherProvider>(context, listen: false);
+      provider.loadPayments();
+      // Total Paid / Pending Due live on the dashboard payload — make sure it's
+      // loaded so the summary at the top of this screen has values.
+      if (provider.dashboardData == null) {
+        provider.loadDashboard();
+      }
     });
   }
 
@@ -33,6 +39,41 @@ class _PaymentScreenState extends State<PaymentScreen>
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // Payment summary — Total Paid + Pending Due (moved here from the
+        // dashboard). Reads from the dashboard payload.
+        Consumer<TeacherProvider>(
+          builder: (context, provider, _) {
+            final data = provider.dashboardData;
+            final totalPaid = data?['total_earnings'] ?? 0;
+            final pendingDue = data?['pending_due'] ?? 0;
+            return Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _SummaryTile(
+                      icon: Icons.check_circle,
+                      label: 'Total Paid',
+                      value: '৳$totalPaid',
+                      color: AppTheme.successColor,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _SummaryTile(
+                      icon: Icons.pending_actions,
+                      label: 'Pending Due',
+                      value: '৳$pendingDue',
+                      color: AppTheme.errorColor,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
         // Tab bar
         Container(
           color: Colors.white,
@@ -708,5 +749,53 @@ class _PaymentHistoryList extends StatelessWidget {
     } catch (_) {
       return dateStr;
     }
+  }
+}
+
+/// Compact summary tile used in the payment header for Total Paid / Pending Due.
+class _SummaryTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _SummaryTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

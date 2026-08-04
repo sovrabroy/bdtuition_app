@@ -17,6 +17,10 @@ class TuitionProvider with ChangeNotifier {
   int _lastPage = 1;
   int _total = 0;
 
+  // Publicly-available tuition count for the logged-out welcome screen.
+  int? _availableCount;
+  int? get availableCount => _availableCount;
+
   // Filters
   String? _selectedCity;
   List<String> _selectedAreas = [];
@@ -94,6 +98,21 @@ class TuitionProvider with ChangeNotifier {
     if (_currentPage < _lastPage) {
       _currentPage++;
       await loadTuitions();
+    }
+  }
+
+  /// Load the public count of available tuitions for the welcome screen.
+  /// Does NOT require authentication — the backend must allow this endpoint
+  /// without a token.
+  Future<void> loadTuitionCount() async {
+    try {
+      final response = await _api.getTuitionCount();
+      if (response.data['success'] == true) {
+        _availableCount = response.data['count'] ?? response.data['data'];
+        notifyListeners();
+      }
+    } catch (_) {
+      // Silent failure — welcome screen just won't show the count.
     }
   }
 

@@ -165,6 +165,12 @@ class ApiService {
     return await _dio.get('${ApiConfig.tuitions}/$id');
   }
 
+  /// Public count of currently-available tuitions. Used on the logged-out
+  /// welcome screen, so it must NOT require an auth token on the backend.
+  Future<Response> getTuitionCount() async {
+    return await _dio.get(ApiConfig.tuitionCount);
+  }
+
   Future<Response> applyForTuition(int tuitionId, String authorityReference) async {
     return await _dio.post('${ApiConfig.tuitions}/$tuitionId/apply', data: {
       'authority_reference': authorityReference,

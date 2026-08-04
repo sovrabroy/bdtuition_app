@@ -15,12 +15,67 @@ class _GuardianListScreenState extends State<GuardianListScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<TeacherProvider>(context, listen: false).loadGuardians();
+      final provider = Provider.of<TeacherProvider>(context, listen: false);
+      provider.loadGuardians();
+      // Active Tuitions count comes from the dashboard payload — moved here
+      // from the dashboard screen.
+      if (provider.dashboardData == null) {
+        provider.loadDashboard();
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Active Tuitions summary — moved here from the dashboard.
+        Consumer<TeacherProvider>(
+          builder: (context, provider, _) {
+            final active = provider.dashboardData?['active_assignments'] ?? 0;
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.school, color: Colors.white, size: 28),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Active Tuitions',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$active',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        Expanded(child: _buildGuardianList()),
+      ],
+    );
+  }
+
+  Widget _buildGuardianList() {
     return Consumer<TeacherProvider>(
       builder: (context, provider, _) {
         if (provider.isLoading && provider.guardians.isEmpty) {

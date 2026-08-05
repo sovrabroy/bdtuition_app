@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
@@ -168,32 +169,72 @@ class _HomeScreenState extends State<HomeScreen> {
       const ProfileScreen(),
     ];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('BDTuition'),
+    return PopScope(
+      // Don't let a single back-press close the app. If the user isn't on the
+      // Dashboard tab, back returns them there; on the Dashboard, back asks for
+      // an exit confirmation.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (_currentIndex != 0) {
+          setState(() => _currentIndex = 0);
+          return;
+        }
+        final shouldExit = await _confirmExit();
+        if (shouldExit) {
+          // Close the app.
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('BDTuition'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: _confirmLogout,
+            ),
+          ],
+        ),
+        body: screens[_currentIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (i) => setState(() => _currentIndex = i),
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: AppTheme.primaryColor,
+          unselectedItemColor: Colors.grey,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+            BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Tuitions'),
+            BottomNavigationBarItem(icon: Icon(Icons.verified_user), label: 'Demo'),
+            BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Guardians'),
+            BottomNavigationBarItem(icon: Icon(Icons.payment), label: 'Payments'),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Confirms before the app closes on a back-press from the Dashboard tab.
+  Future<bool> _confirmExit() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Exit app?'),
+        content: const Text('Do you want to close BDTuition?'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _confirmLogout,
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Exit'),
           ),
         ],
       ),
-      body: screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppTheme.primaryColor,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Tuitions'),
-          BottomNavigationBarItem(icon: Icon(Icons.verified_user), label: 'Demo'),
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Guardians'),
-          BottomNavigationBarItem(icon: Icon(Icons.payment), label: 'Payments'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
-      ),
     );
+    return shouldExit ?? false;
   }
 }

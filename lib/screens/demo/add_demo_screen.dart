@@ -19,7 +19,6 @@ class AddDemoScreen extends StatefulWidget {
 class _AddDemoScreenState extends State<AddDemoScreen> {
   final _formKey = GlobalKey<FormState>();
   final _codeCtrl = TextEditingController();
-  final _guardianCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final ApiService _api = ApiService();
 
@@ -154,10 +153,10 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
     }
   }
 
-  /// Applies guardian name / address / coordinates from a guardian map.
+  /// Applies address / coordinates from a guardian map. Guardian name is NOT
+  /// stored locally — the server pulls it from the tuition record when sending
+  /// the OTP.
   void _fillFromGuardian(Map<String, dynamic> g) {
-    final guardian =
-        _pick(g, ['guardian_name', 'guardian', 'name', 'contact_name']);
     final address = _pick(g, ['address', 'full_address', 'tuition_address']);
     final area = _pick(g, ['area', 'location']);
     final city = _pick(g, ['city', 'district']);
@@ -167,7 +166,6 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
 
     setState(() {
       if (tid != null) _tuitionId = tid;
-      if (guardian.isNotEmpty) _guardianCtrl.text = guardian;
       if (address.isNotEmpty) {
         _addressCtrl.text = address;
       } else if (area.isNotEmpty || city.isNotEmpty) {
@@ -240,7 +238,6 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
   @override
   void dispose() {
     _codeCtrl.dispose();
-    _guardianCtrl.dispose();
     _addressCtrl.dispose();
     super.dispose();
   }
@@ -367,7 +364,7 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       tuitionId: _tuitionId,
       tuitionCode: _codeCtrl.text.trim(),
-      guardianName: _guardianCtrl.text.trim(),
+      guardianName: '',
       address: _addressCtrl.text.trim(),
       guardianLat: destLat,
       guardianLng: destLng,
@@ -470,17 +467,6 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
                 ),
               ),
               onFieldSubmitted: (_) => _lookupCode(),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _guardianCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Guardian Name',
-                prefixIcon: Icon(Icons.person),
-                border: OutlineInputBorder(),
-              ),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),

@@ -366,6 +366,33 @@ class _DemoDashboardScreenState extends State<DemoDashboardScreen> {
                 ),
               ),
             ],
+            if (demo.notes.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.sticky_note_2,
+                        size: 15, color: Colors.orange),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        demo.notes.trim(),
+                        style: const TextStyle(
+                            fontSize: 12.5, color: Colors.black87),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [
@@ -416,12 +443,25 @@ class _DemoDashboardScreenState extends State<DemoDashboardScreen> {
               const SizedBox(height: 6),
               Row(
                 children: [
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: () => _editNotes(demo, provider),
+                      icon: Icon(
+                        demo.notes.trim().isEmpty
+                            ? Icons.edit_note
+                            : Icons.sticky_note_2,
+                        size: 18,
+                      ),
+                      label: Text(
+                          demo.notes.trim().isEmpty ? 'Add Update' : 'Edit Update'),
+                    ),
+                  ),
                   if (demo.checkIns.isNotEmpty)
                     Expanded(
                       child: TextButton.icon(
                         onPressed: () => _confirmComplete(demo, provider),
                         icon: const Icon(Icons.done_all, size: 18),
-                        label: const Text('Mark Completed'),
+                        label: const Text('Completed'),
                       ),
                     ),
                   Expanded(
@@ -568,6 +608,59 @@ class _DemoDashboardScreenState extends State<DemoDashboardScreen> {
     if (ok == true) {
       await provider.completeDemo(demo.id);
     }
+  }
+
+  /// Lets the teacher write/edit a free-text update on the demo (e.g. guardian
+  /// changed the time, a problem came up). Saves to server + locally.
+  Future<void> _editNotes(DemoClass demo, DemoProvider provider) async {
+    final controller = TextEditingController(text: demo.notes);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Demo Update / Note'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Write any update here — e.g. the guardian changed the time, '
+              'the address was hard to find, or any problem.',
+              style: TextStyle(fontSize: 12.5, color: Colors.black54),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              maxLines: 4,
+              maxLength: 2000,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                hintText: 'Type your update…',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (saved != true) return;
+    final ok = await provider.saveNotes(demo, controller.text.trim());
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Update saved.'
+            : (provider.lastError ?? 'Update saved on device only.')),
+      ),
+    );
   }
 
   Future<void> _confirmDelete(DemoClass demo, DemoProvider provider) async {

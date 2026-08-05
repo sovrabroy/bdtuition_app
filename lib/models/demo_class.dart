@@ -28,6 +28,15 @@ class DemoClass {
   final double? guardianLat;
   final double? guardianLng;
 
+  /// Teacher's own location at the moment they scheduled the demo. Stored so
+  /// the admin can see where the teacher was when they created the schedule.
+  final double? teacherLat;
+  final double? teacherLng;
+
+  /// Free-text notes the teacher can edit (e.g. "guardian changed the time",
+  /// "address hard to find"). Synced to the backend.
+  String notes;
+
   /// Scheduled demo start time.
   final DateTime scheduledAt;
 
@@ -46,6 +55,9 @@ class DemoClass {
     required this.address,
     this.guardianLat,
     this.guardianLng,
+    this.teacherLat,
+    this.teacherLng,
+    this.notes = '',
     required this.scheduledAt,
     this.status = 'pending',
     this.otpStatus = 'not_sent',
@@ -124,6 +136,9 @@ class DemoClass {
         'address': address,
         'guardian_lat': guardianLat,
         'guardian_lng': guardianLng,
+        'teacher_lat': teacherLat,
+        'teacher_lng': teacherLng,
+        'notes': notes,
         'scheduled_at': scheduledAt.toIso8601String(),
         'status': status,
         'otp_status': otpStatus,
@@ -139,6 +154,9 @@ class DemoClass {
         address: json['address'] as String? ?? '',
         guardianLat: (json['guardian_lat'] as num?)?.toDouble(),
         guardianLng: (json['guardian_lng'] as num?)?.toDouble(),
+        teacherLat: (json['teacher_lat'] as num?)?.toDouble(),
+        teacherLng: (json['teacher_lng'] as num?)?.toDouble(),
+        notes: json['notes'] as String? ?? '',
         scheduledAt: DateTime.tryParse(json['scheduled_at'] as String? ?? '') ??
             DateTime.now(),
         status: json['status'] as String? ?? 'pending',

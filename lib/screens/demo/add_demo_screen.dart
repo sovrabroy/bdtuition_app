@@ -368,6 +368,8 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
       address: _addressCtrl.text.trim(),
       guardianLat: destLat,
       guardianLng: destLng,
+      teacherLat: _teacherLat,
+      teacherLng: _teacherLng,
       scheduledAt: _scheduledAt,
     );
 

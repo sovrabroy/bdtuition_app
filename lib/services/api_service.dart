@@ -288,6 +288,8 @@ class ApiService {
     required DateTime scheduledAt,
     double? guardianLat,
     double? guardianLng,
+    double? teacherLat,
+    double? teacherLng,
   }) async {
     final data = <String, dynamic>{
       'scheduled_at': scheduledAt.toIso8601String(),
@@ -296,7 +298,17 @@ class ApiService {
     if (assignmentId != null) data['assignment_id'] = assignmentId;
     if (guardianLat != null) data['guardian_lat'] = guardianLat;
     if (guardianLng != null) data['guardian_lng'] = guardianLng;
+    if (teacherLat != null) data['teacher_lat'] = teacherLat;
+    if (teacherLng != null) data['teacher_lng'] = teacherLng;
     return await _dio.post(ApiConfig.demoSchedule, data: data);
+  }
+
+  /// Updates the free-text notes on a scheduled demo (server demo id required).
+  /// Lets the teacher record changes like a rescheduled time or a problem.
+  Future<Response> updateDemoNotes(int demoId, String notes) async {
+    return await _dio.post('${ApiConfig.demos}/$demoId/notes', data: {
+      'notes': notes,
+    });
   }
 
   /// Teacher pastes the OTP the guardian gave them, together with their own live

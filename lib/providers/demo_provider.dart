@@ -63,14 +63,18 @@ class DemoProvider with ChangeNotifier {
         scheduledAt: demo.scheduledAt,
         guardianLat: demo.guardianLat,
         guardianLng: demo.guardianLng,
+        teacherLat: demo.teacherLat,
+        teacherLng: demo.teacherLng,
       );
       final data = res.data;
       if (data is Map && data['success'] == true) {
         final sid = (data['demo_id'] as num?)?.toInt();
         if (sid != null) {
+          // Only mutate the in-memory object here. The caller (_save) persists
+          // the record exactly once via addDemo(); writing it here too would
+          // create a duplicate (updateDemo adds it when the id isn't found yet).
           demo.serverId = sid;
           demo.otpStatus = 'not_sent';
-          await _storage.updateDemo(demo);
         }
         return true;
       }
@@ -140,6 +144,29 @@ class DemoProvider with ChangeNotifier {
   Future<void> updateDemo(DemoClass demo) async {
     await _storage.updateDemo(demo);
     await load();
+  }
+
+  /// Saves the teacher's edited [notes] both on the server (so admin sees them)
+  /// and locally. Returns true on success. If the demo isn't on the server yet
+  /// it still saves locally so nothing is lost.
+  Future<bool> saveNotes(DemoClass demo, String notes) async {
+    demo.notes = notes;
+    await _storage.updateDemo(demo);
+    if (demo.serverId == null) {
+      await load();
+      return true;
+    }
+    try {
+      final res = await _api.updateDemoNotes(demo.serverId!, notes);
+      final ok = res.data is Map && res.data['success'] == true;
+      await load();
+      if (!ok) _lastError = 'Notes saved on device but not synced to server.';
+      return ok;
+    } catch (_) {
+      await load();
+      _lastError = 'Notes saved on device but not synced (no connection).';
+      return false;
+    }
   }
 
   Future<void> deleteDemo(String id) async {

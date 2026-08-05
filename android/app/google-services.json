@@ -7,12 +7,33 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:98555773695:android:3ed89de6628af615cb42ca",
+        "mobilesdk_app_id": "1:98555773695:android:ac5787c794e679b3cb42ca",
         "android_client_info": {
-          "package_name": "com.example.bdtuition_app"
+          "package_name": "com.bdtuition.teacher"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "98555773695-gqa8jk020l7k1heb7u0joarmvu4b2n2n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bdtuition.teacher",
+            "certificate_hash": "58f3ebb9a7229dfd984ebf889b7b3a54c570a520"
+          }
+        },
+        {
+          "client_id": "98555773695-n2v5japm4uudffaln3e3goj79adkjni2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bdtuition.teacher",
+            "certificate_hash": "e12aef076f593c4fcae2a8c1c500ebb97762944f"
+          }
+        },
+        {
+          "client_id": "98555773695-gkt2o9q59nsjqjlhgj5octi199tv2b0n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBG0O7YQKMOMOF5Y5t0fO7IdW1vW012ajY"
@@ -20,7 +41,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "98555773695-gkt2o9q59nsjqjlhgj5octi199tv2b0n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

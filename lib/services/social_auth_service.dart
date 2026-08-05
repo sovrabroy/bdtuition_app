@@ -6,8 +6,15 @@ import 'package:google_sign_in/google_sign_in.dart';
 /// backend does the real verification and login. Returns null when the user
 /// cancels, or throws a readable message on error.
 class SocialAuthService {
+  // The Web client ID (client_type 3 from google-services.json). Required as
+  // serverClientId so Android returns an idToken whose `aud` the backend can
+  // verify. Without this, auth.idToken is usually null on Android.
+  static const String _webClientId =
+      '98555773695-gkt2o9q59nsjqjlhgj5octi199tv2b0n.apps.googleusercontent.com';
+
   static final GoogleSignIn _google = GoogleSignIn(
     scopes: const ['email', 'profile'],
+    serverClientId: _webClientId,
   );
 
   /// Signs in with Google and returns the ID token, or null if cancelled.

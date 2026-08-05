@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BDTuition</string>
+    <!-- Facebook Login configuration.
+         Replace the placeholder values below after creating the app at
+         https://developers.facebook.com  (Settings → Basic).
+         - facebook_app_id: the numeric App ID
+         - facebook_client_token: Settings → Advanced → Client token
+         - fb_login_protocol_scheme: literally "fb" + your App ID -->
+    <string name="facebook_app_id">YOUR_FB_APP_ID</string>
+    <string name="facebook_client_token">YOUR_FB_CLIENT_TOKEN</string>
+    <string name="fb_login_protocol_scheme">fbYOUR_FB_APP_ID</string>
+</resources>

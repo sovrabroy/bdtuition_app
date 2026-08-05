@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../dashboard/home_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
+import '../../widgets/social_login_buttons.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -222,6 +223,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 24),
+
+                // Social login
+                const SocialLoginButtons(),
               ],
             ),
           ),

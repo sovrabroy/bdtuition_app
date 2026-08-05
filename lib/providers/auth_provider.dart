@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import '../services/api_service.dart';
 import '../services/push_service.dart';
+import '../services/social_auth_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _api = ApiService();
@@ -88,6 +89,78 @@ class AuthProvider with ChangeNotifier {
       _error = _getErrorMessage(e);
       notifyListeners();
       return {'success': false, 'message': _error};
+    }
+  }
+
+  /// Completes a social login once the app has obtained a provider token.
+  /// Pass the raw backend response data. If it's a login (`new_user:false`),
+  /// stores the token + teacher and returns {loggedIn:true}. If it's a new
+  /// user, returns {loggedIn:false, newUser:true, prefill:{...}} so the caller
+  /// can open registration prefilled. On failure returns {error:...}.
+  Future<Map<String, dynamic>> _handleSocialResponse(
+      Map<String, dynamic> data) async {
+    if (data['success'] != true) {
+      _error = data['message']?.toString() ?? 'Sign-in failed';
+      return {'loggedIn': false, 'error': _error};
+    }
+
+    // Existing account → real login.
+    if (data['new_user'] == false && data['token'] != null) {
+      await _api.setToken(data['token']);
+      _teacher = data['teacher'];
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('teacher_data', json.encode(_teacher));
+      PushService.instance.registerWithBackendIfLoggedIn();
+      notifyListeners();
+      return {'loggedIn': true};
+    }
+
+    // No account yet → app should open registration prefilled.
+    return {
+      'loggedIn': false,
+      'newUser': true,
+      'prefill': Map<String, dynamic>.from(data['prefill'] ?? {}),
+      'provider': data['provider'],
+    };
+  }
+
+  /// Google: exchange an already-obtained Google ID token with the backend.
+  Future<Map<String, dynamic>> loginWithGoogle(String idToken) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final response = await _api.googleLogin(idToken);
+      final result = await _handleSocialResponse(
+          Map<String, dynamic>.from(response.data));
+      _isLoading = false;
+      notifyListeners();
+      return result;
+    } catch (e) {
+      _error = _getErrorMessage(e);
+      _isLoading = false;
+      notifyListeners();
+      return {'loggedIn': false, 'error': _error};
+    }
+  }
+
+  /// Facebook: exchange an already-obtained FB access token with the backend.
+  Future<Map<String, dynamic>> loginWithFacebook(String accessToken) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final response = await _api.facebookLogin(accessToken);
+      final result = await _handleSocialResponse(
+          Map<String, dynamic>.from(response.data));
+      _isLoading = false;
+      notifyListeners();
+      return result;
+    } catch (e) {
+      _error = _getErrorMessage(e);
+      _isLoading = false;
+      notifyListeners();
+      return {'loggedIn': false, 'error': _error};
     }
   }
 
@@ -180,6 +253,9 @@ class AuthProvider with ChangeNotifier {
     try {
       await _api.logout();
     } catch (_) {}
+    // Also clear any Google/Facebook session so the next social sign-in shows
+    // the account chooser instead of silently reusing the old account.
+    await SocialAuthService.signOutAll();
     await _api.clearToken();
     _teacher = null;
     notifyListeners();

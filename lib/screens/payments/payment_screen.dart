@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/teacher_provider.dart';
+import 'bkash_payment_screen.dart';
 
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({super.key});
@@ -154,227 +155,205 @@ class _PaymentScreenState extends State<PaymentScreen>
     );
   }
 
+  /// Automatic bKash payment. Asks only for the amount, then opens the bKash
+  /// hosted checkout in a WebView. No manual transaction ID — the backend
+  /// confirms the payment via its bKash callback.
   void _showPaymentDialog(Map<String, dynamic> assignment) {
     final dueAmount = _dueAmountOf(assignment);
     final amountController = TextEditingController(
       text: dueAmount > 0 ? dueAmount.toStringAsFixed(0) : '',
     );
-    final transactionIdController = TextEditingController();
-    String selectedMethod = 'bkash';
 
     showDialog(
       context: context,
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Text('Make Payment'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Tuition info
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withOpacity(0.06),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            assignment['tuition_code'] ?? '',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primaryColor,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Due: ৳${dueAmount.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.errorColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Amount
-                    TextField(
-                      controller: amountController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Amount',
-                        prefixText: '৳ ',
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Payment method
-                    const Text(
-                      'Payment Method',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFE0E0E0)),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: selectedMethod,
-                          isExpanded: true,
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'bkash',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.phone_android,
-                                      size: 18, color: Color(0xFFE2136E)),
-                                  SizedBox(width: 8),
-                                  Text('bKash'),
-                                ],
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: 'nagad',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.phone_android,
-                                      size: 18, color: Color(0xFFF6921E)),
-                                  SizedBox(width: 8),
-                                  Text('Nagad'),
-                                ],
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: 'rocket',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.phone_android,
-                                      size: 18, color: Color(0xFF8B2F87)),
-                                  SizedBox(width: 8),
-                                  Text('Rocket'),
-                                ],
-                              ),
-                            ),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) {
-                              setDialogState(() => selectedMethod = val);
-                            }
-                          },
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text('Pay with bKash'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Tuition info
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        assignment['tuition_code'] ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryColor,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Due: ৳${dueAmount.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.errorColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
 
-                    // Transaction ID
-                    TextField(
-                      controller: transactionIdController,
-                      decoration: const InputDecoration(
-                        labelText: 'Transaction ID',
-                        hintText: 'Enter your transaction ID',
+                // Amount
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Amount',
+                    prefixText: '৳ ',
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // bKash note
+                Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        size: 16, color: AppTheme.textSecondary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'You will be redirected to bKash to complete the '
+                        'payment securely.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final amount = amountController.text.trim();
-                    final txId = transactionIdController.text.trim();
-
-                    if (amount.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter the amount'),
-                          backgroundColor: AppTheme.errorColor,
-                        ),
-                      );
-                      return;
-                    }
-
-                    if (txId.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter the transaction ID'),
-                          backgroundColor: AppTheme.errorColor,
-                        ),
-                      );
-                      return;
-                    }
-
-                    Navigator.pop(ctx);
-
-                    // Show loading
-                    showDialog(
-                      context: this.context,
-                      barrierDismissible: false,
-                      builder: (_) =>
-                          const Center(child: CircularProgressIndicator()),
-                    );
-
-                    final provider = Provider.of<TeacherProvider>(
-                      this.context,
-                      listen: false,
-                    );
-                    final success = await provider.processPayment(
-                      assignment['assignment_id'] ?? assignment['id'],
-                      {
-                        'amount': amount,
-                        'payment_method': selectedMethod,
-                        'transaction_id': txId,
-                      },
-                    );
-
-                    if (!mounted) return;
-                    Navigator.pop(this.context); // dismiss loading
-
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          success
-                              ? 'Payment submitted successfully!'
-                              : 'Payment failed. Please try again.',
-                        ),
-                        backgroundColor:
-                            success ? AppTheme.successColor : AppTheme.errorColor,
-                      ),
-                    );
-
-                    if (success) {
-                      provider.loadPayments();
-                    }
-                  },
-                  child: const Text('Submit Payment'),
-                ),
               ],
-            );
-          },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE2136E),
+              ),
+              icon: const Icon(Icons.phone_android, size: 18),
+              label: const Text('Pay with bKash'),
+              onPressed: () {
+                final amountText = amountController.text.trim();
+                final amount = double.tryParse(amountText);
+
+                if (amount == null || amount <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a valid amount'),
+                      backgroundColor: AppTheme.errorColor,
+                    ),
+                  );
+                  return;
+                }
+
+                if (amount > dueAmount) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Amount cannot be more than the due'),
+                      backgroundColor: AppTheme.errorColor,
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.pop(ctx);
+                _startBkashPayment(
+                  assignment['assignment_id'] ?? assignment['id'],
+                  amount,
+                );
+              },
+            ),
+          ],
         );
       },
     );
+  }
+
+  /// Creates the bKash checkout session and opens the gateway WebView.
+  Future<void> _startBkashPayment(dynamic assignmentId, double amount) async {
+    final provider = Provider.of<TeacherProvider>(context, listen: false);
+
+    // Loading while the checkout session is created.
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final result = await provider.createBkashPayment(
+      assignmentId is int
+          ? assignmentId
+          : int.tryParse('$assignmentId') ?? 0,
+      amount,
+    );
+
+    if (!mounted) return;
+    Navigator.pop(context); // dismiss loading
+
+    if (result['success'] != true || result['bkash_url'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message']?.toString() ??
+              'Could not start bKash payment.'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+
+    // Open the bKash hosted checkout. Returns true when the success redirect
+    // is detected.
+    final paid = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BkashPaymentScreen(
+          bkashUrl: result['bkash_url'].toString(),
+          paymentId: result['payment_id']?.toString() ?? '',
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (paid == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment completed successfully!'),
+          backgroundColor: AppTheme.successColor,
+        ),
+      );
+      // Refresh both the payment list and the dashboard summary (paid/due).
+      provider.loadPayments();
+      provider.loadDashboard();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment was not completed.'),
+          backgroundColor: AppTheme.textSecondary,
+        ),
+      );
+      // Reload in case the payment did go through but the redirect was missed.
+      provider.loadPayments();
+    }
   }
 }
 
@@ -570,10 +549,10 @@ class _DuePaymentsList extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () => onPay(payment),
-                      icon: const Icon(Icons.payment, size: 18),
-                      label: const Text('Pay Now'),
+                      icon: const Icon(Icons.phone_android, size: 18),
+                      label: const Text('Pay with bKash'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.successColor,
+                        backgroundColor: const Color(0xFFE2136E),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                     ),

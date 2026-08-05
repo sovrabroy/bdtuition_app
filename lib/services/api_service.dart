@@ -128,6 +128,18 @@ class ApiService {
     return await _dio.post(ApiConfig.logout);
   }
 
+  /// Sends the Google ID token to the backend. Backend verifies it with Google
+  /// and returns either a login token or new_user:true + prefill for signup.
+  Future<Response> googleLogin(String idToken) async {
+    return await _dio.post(ApiConfig.googleLogin, data: {'id_token': idToken});
+  }
+
+  /// Sends the Facebook access token to the backend for verification + login.
+  Future<Response> facebookLogin(String accessToken) async {
+    return await _dio.post(ApiConfig.facebookLogin,
+        data: {'access_token': accessToken});
+  }
+
   // ==================== DASHBOARD ====================
 
   Future<Response> getDashboard() async {

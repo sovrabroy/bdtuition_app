@@ -45,7 +45,14 @@ const Map<String, List<String>> kExpectedSubjectGroups = {
 };
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  final String? prefillName;
+  final String? prefillEmail;
+
+  const RegisterScreen({
+    super.key,
+    this.prefillName,
+    this.prefillEmail,
+  });
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -558,6 +565,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // When arriving from a Google/Facebook sign-up, pre-fill name + email so
+    // the teacher only has to complete the remaining fields (phone, documents).
+    if (widget.prefillName != null && widget.prefillName!.isNotEmpty) {
+      _nameCtrl.text = widget.prefillName!;
+    }
+    if (widget.prefillEmail != null && widget.prefillEmail!.isNotEmpty) {
+      _emailCtrl.text = widget.prefillEmail!;
+    }
   }
 
   @override

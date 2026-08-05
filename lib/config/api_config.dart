@@ -11,6 +11,11 @@ class ApiConfig {
   static const String resetPassword = '/auth/reset-password';
   static const String logout = '/auth/logout';
 
+  // Social login (Google / Facebook). Backend verifies the provider token and
+  // either logs the teacher in or returns new_user:true + prefill for signup.
+  static const String googleLogin = '/auth/google';
+  static const String facebookLogin = '/auth/facebook';
+
   // Dashboard
   static const String dashboard = '/dashboard';
 

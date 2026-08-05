@@ -201,6 +201,37 @@ class TeacherProvider with ChangeNotifier {
     }
   }
 
+  /// Starts an automatic bKash gateway payment. Asks the backend to create a
+  /// bKash checkout session and returns the hosted `bkash_url` + `payment_id`
+  /// so the UI can open it in a WebView. On failure returns a map with
+  /// success=false and a message.
+  Future<Map<String, dynamic>> createBkashPayment(
+      int assignmentId, double amount) async {
+    try {
+      final response = await _api.createBkashPayment(assignmentId, amount);
+      final data = response.data;
+      if (data is Map && data['success'] == true) {
+        return {
+          'success': true,
+          'bkash_url': data['bkash_url'],
+          'payment_id': data['payment_id'],
+        };
+      }
+      return {
+        'success': false,
+        'message': (data is Map ? data['message'] : null)?.toString() ??
+            'Could not start bKash payment.',
+      };
+    } catch (e) {
+      String msg = 'Could not start bKash payment. Please try again.';
+      if (e is DioException) {
+        final d = e.response?.data;
+        if (d is Map && d['message'] != null) msg = d['message'].toString();
+      }
+      return {'success': false, 'message': msg};
+    }
+  }
+
   Future<void> loadRefunds() async {
     _isLoading = true;
     notifyListeners();

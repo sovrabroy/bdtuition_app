@@ -392,8 +392,8 @@ class _AddDemoScreenState extends State<AddDemoScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-            'Demo scheduled. An OTP will be sent to the guardian ~2 hours '
-            'before the demo time.'),
+            'Demo scheduled. An OTP has been sent to the guardian now. '
+            'Collect it from them when you reach their home to verify.'),
       ),
     );
     Navigator.pop(context);

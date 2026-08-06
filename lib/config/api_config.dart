@@ -62,6 +62,12 @@ class ApiConfig {
   // Rolling teacher location log (sent when the app is used, not in background).
   static const String locationLog = '/location/log';
 
+  // App activity audit (admin "Teacher Activity" page). Foreground sessions and
+  // discrete events (install) are reported here so the admin can see how long
+  // the teacher used the app and when it was first installed.
+  static const String appSession = '/activity/session';
+  static const String appEvent = '/activity/event';
+
   /// Resolve a photo/document path returned by the API into a full URL.
   /// Handles: already-absolute URLs, paths that already include "uploads/",
   /// and bare filenames (which get the teacher-documents base prefixed).

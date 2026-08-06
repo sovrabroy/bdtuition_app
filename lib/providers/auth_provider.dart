@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import '../services/api_service.dart';
 import '../services/push_service.dart';
+import '../services/activity_service.dart';
 import '../services/social_auth_service.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -31,6 +32,9 @@ class AuthProvider with ChangeNotifier {
       _teacher = json.decode(teacherJson);
       // Returning logged-in user: make sure the backend has this device's token.
       PushService.instance.registerWithBackendIfLoggedIn();
+      // Report a one-time install for teachers who were already logged in when
+      // this build first shipped the feature (they'd otherwise never trigger it).
+      ActivityService.instance.reportInstallOnce();
     }
     _isInitialized = true;
     notifyListeners();
@@ -54,6 +58,9 @@ class AuthProvider with ChangeNotifier {
 
         // Register this device for "nearby tuition" push notifications.
         PushService.instance.registerWithBackendIfLoggedIn();
+        // Open a foreground activity session now that we're logged in (the app
+        // is already resumed, so the lifecycle observer won't fire on its own).
+        ActivityService.instance.startSession();
 
         _isLoading = false;
         notifyListeners();
@@ -111,6 +118,7 @@ class AuthProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('teacher_data', json.encode(_teacher));
       PushService.instance.registerWithBackendIfLoggedIn();
+      ActivityService.instance.startSession();
       notifyListeners();
       return {'loggedIn': true};
     }
@@ -182,6 +190,9 @@ class AuthProvider with ChangeNotifier {
 
         // Register this device for "nearby tuition" push notifications.
         PushService.instance.registerWithBackendIfLoggedIn();
+        // Open a foreground activity session now that we're logged in (the app
+        // is already resumed, so the lifecycle observer won't fire on its own).
+        ActivityService.instance.startSession();
 
         _isLoading = false;
         notifyListeners();
@@ -250,6 +261,9 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Close the activity session while the token is still valid, so the end
+    // ping (with its duration) can be attributed to this teacher.
+    await ActivityService.instance.endSession();
     try {
       await _api.logout();
     } catch (_) {}

@@ -74,7 +74,9 @@ class DemoProvider with ChangeNotifier {
           // the record exactly once via addDemo(); writing it here too would
           // create a duplicate (updateDemo adds it when the id isn't found yet).
           demo.serverId = sid;
-          demo.otpStatus = 'not_sent';
+          // Backend now sends the OTP to the guardian's phone immediately on
+          // schedule (not 2h before via cron), so reflect that state here.
+          demo.otpStatus = 'otp_sent';
         }
         return true;
       }

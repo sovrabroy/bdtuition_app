@@ -360,4 +360,31 @@ class ApiService {
     if (accuracy != null) data['accuracy'] = accuracy;
     return await _dio.post(ApiConfig.locationLog, data: data);
   }
+
+  // ==================== APP ACTIVITY (audit) ====================
+
+  /// Report a foreground session boundary. [action] is 'start' or 'end';
+  /// [sessionToken] pairs the two so the backend fills the duration in on 'end'.
+  /// [durationSeconds] is sent on 'end' so the admin sees how long the app was
+  /// actually open.
+  Future<Response> logAppSession({
+    required String action,
+    required String sessionToken,
+    int? durationSeconds,
+  }) async {
+    final data = <String, dynamic>{
+      'action': action,
+      'session_token': sessionToken,
+    };
+    if (durationSeconds != null) data['duration_seconds'] = durationSeconds;
+    return await _dio.post(ApiConfig.appSession, data: data);
+  }
+
+  /// Report a discrete app event (e.g. 'install'). [meta] is optional extra
+  /// context stored as JSON alongside the row.
+  Future<Response> logAppEvent(String type, {Map<String, dynamic>? meta}) async {
+    final data = <String, dynamic>{'type': type};
+    if (meta != null) data['meta'] = meta;
+    return await _dio.post(ApiConfig.appEvent, data: data);
+  }
 }
